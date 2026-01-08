@@ -1,0 +1,9 @@
+docs/note.md
+*.o
+*.out
+*.csv
+day*/
+*.log
+src/client
+src/server
+.vscode
