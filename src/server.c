@@ -85,3 +85,35 @@ int recv_connection(int socket) {
 
     return 0;
 }
+
+int main(void) {
+    int socket = start_server();
+
+    while (1) {
+        char line[MAX_LINE_LEN + 1];
+        memset(line, 0, MAX_LINE_LEN);
+
+        int connected_socket = recv_connection(socket);
+
+        int pid = fork();
+
+        if (pid < 0) {
+            close(connected_socket);
+            continue;
+        } else if (pid == 0) {
+            // Child process
+            close(socket);
+            while (get_message(line, connected_socket)){
+                printf("%s\n", line);
+                // process
+            }
+            close(connected_socket);
+            exit(0);
+        } else {
+            // Parent process
+            close(connected_socket);
+        }
+    }
+
+    return 0;
+}
