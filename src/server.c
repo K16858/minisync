@@ -12,6 +12,19 @@
 
 struct addrinfo hints, *res;
 
+int subst(char *str, char c1, char c2){
+    int c=0;
+    while(*str!='\0'){
+        if(*str==c1){
+            *str=c2;
+            c++;
+        }
+        str++;
+    }
+
+    return c;
+}
+
 int send_end_message(int socket) {
     int length = 0;
     send(socket, &length, sizeof(length), 0);
