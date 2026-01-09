@@ -12,6 +12,12 @@
 
 struct addrinfo hints, *res;
 
+enum Content {
+    TYPE_FILE,
+    TYPE_MESSAGE,
+    NONE
+};
+
 int subst(char *str, char c1, char c2){
     int c=0;
     while(*str!='\0'){
@@ -27,12 +33,20 @@ int subst(char *str, char c1, char c2){
 
 int send_end_message(int socket) {
     int length = 0;
+    enum Content content_type = NONE;
+
+    send(socket, &content_type, sizeof(content_type), 0);
     send(socket, &length, sizeof(length), 0);
     return 0;
 }
 
 int send_message(int socket, char *msg) {
     int length = strlen(msg);
+    enum Content content_type = TYPE_MESSAGE;
+
+    if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
+        return -1;
+    }
 
     if (send(socket, &length, sizeof(length), 0) < 0) {
         return -1;
@@ -99,6 +113,30 @@ int recv_connection(int socket) {
     return 0;
 }
 
+int recv_file(int socket) {
+    FILE *fpw;
+    fpw = fopen("temp", "wb");
+
+    while(1) {
+        int length;
+        int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
+
+        if (length == 0) {
+            break;
+        }
+        
+        char *buffer = malloc(length + 1);
+        recv(socket, buffer, length, MSG_WAITALL);
+        buffer[length] = '\0';
+
+        fprintf(fpw, "%s\n", buffer);
+        free(buffer);
+    }
+    fclose(fpw);
+    send_message(socket, "Complete write data");
+    send_end_message(socket);
+}
+
 int main(void) {
     int socket = start_server();
 
@@ -116,9 +154,50 @@ int main(void) {
         } else if (pid == 0) {
             // Child process
             close(socket);
-            while (get_message(line, connected_socket)){
-                printf("%s\n", line);
+            while (1){
+                int length;
+                enum Content content_type;
+                recv(connected_socket, &content_type, sizeof(content_type), MSG_WAITALL);
+
+                if (content_type == TYPE_FILE) {
+                    printf("Content type: FILE\n");
+                } else if (content_type == TYPE_MESSAGE) {
+                    printf("Content type: MESSAGE\n");
+                } else if (content_type == NONE) {
+                    printf("Content type: NONE\n");
+                } else {
+                    printf("Unknown type.\n");
+                }
+
+                int bytes = recv(connected_socket, &length, sizeof(length), MSG_WAITALL);
+                if (bytes <= 0) {
+                    printf("Connection closed\n");
+                    break;
+                }
+
+                if (length == 0) {
+                    break;
+                }
+
+                char *buffer = malloc(length + 1);
+                recv(connected_socket, buffer, length, MSG_WAITALL);
+                buffer[length] = '\0';
+                
+                
+                printf("%s\n", buffer);
+                free(buffer);
                 // process
+                // recv_file(connected_socket);
+                if (content_type == TYPE_FILE) {
+                    send_message(connected_socket, "Content type: FILE");
+                } else if (content_type == TYPE_MESSAGE) {
+                    send_message(connected_socket, "Content type: MESSAGE");
+                } else if (content_type == NONE) {
+                    send_message(connected_socket, "Content type: NONE");
+                } else {
+                    send_message(connected_socket, "Unknown type.");
+                }
+                send_end_message(connected_socket);
             }
             close(connected_socket);
             exit(0);

@@ -10,6 +10,12 @@
 
 #define MAX_LEN 1024
 
+enum Content {
+    TYPE_FILE,
+    TYPE_MESSAGE,
+    NONE
+};
+
 int subst(char *str, char c1, char c2){
     int c=0;
     while(*str!='\0'){
@@ -23,10 +29,10 @@ int subst(char *str, char c1, char c2){
     return c;
 }
 
-void get_line(char *line, FILE *stram){
+void get_line(char *line, FILE *stream){
     while(1){
         line[0] = '\0';
-        if(fgets(line,MAX_LEN+1,stram)==NULL){
+        if(fgets(line,MAX_LEN+1,stream)==NULL){
             fprintf(stderr,"Input ERROR\n");
         }
         subst(line,'\n','\0');
@@ -38,6 +44,36 @@ void get_line(char *line, FILE *stram){
         }
     }
 }
+
+int send_message(int socket, char *msg) {
+    int length = strlen(msg);
+    enum Content content_type = TYPE_MESSAGE;
+
+    if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
+        return -1;
+    }
+
+    if (send(socket, &length, sizeof(length), 0) < 0) {
+        return -1;
+    }
+    
+    if (send(socket, msg, length, 0) < 0) {
+        return -1;
+    }
+    
+    return 0;
+}
+
+int send_end_message(int socket) {
+    int length = 0;
+    enum Content content_type = NONE;
+
+    send(socket, &content_type, sizeof(content_type), 0);
+    send(socket, &length, sizeof(length), 0);
+    return 0;
+}
+
+
 
 struct addrinfo hints, *res;
 
@@ -102,15 +138,20 @@ int main(int argc, char *argv[]) {
     memset(line, 0, MAX_LEN + 1);
     
     while (1){
+        memset(line, 0, MAX_LEN + 1);
         get_line(line,stdin);
-        send(s, line, MAX_LEN, 0);
+
+        send_message(s, line);
+        send_end_message(s);
 
         int connection_closed = 0;
         int should_quit = 0;
 
         while (1) {
-            memset(line, 0, MAX_LEN + 1);
             int length;
+            enum Content content_type;
+            recv(s, &content_type, sizeof(content_type), MSG_WAITALL);
+
             int bytes = recv(s, &length, sizeof(length), MSG_WAITALL);
             if (bytes <= 0) {
                 printf("Connection closed\n");
@@ -119,18 +160,13 @@ int main(int argc, char *argv[]) {
             }
 
             if (length == 0) {
+                should_quit = 1;
                 break;
             }
 
             char *buffer = malloc(length + 1);
             recv(s, buffer, length, MSG_WAITALL);
             buffer[length] = '\0';
-
-            if (strcmp(buffer, "!Q") == 0) {
-                free(buffer);
-                should_quit = 1;
-                break;
-            }
 
             printf("%s\n", buffer);
             free(buffer);
