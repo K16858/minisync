@@ -115,10 +115,10 @@ int recv_connection(int socket) {
 
 int send_file(int socket, char *file) {
     FILE *fpr;
-    fpr = fopen(file,"r");
+    fpr = fopen(file,"rb");
     char line[MAX_LINE_LEN+1];
     char msg[MAX_LINE_LEN+1];
-    memset(msg, 0, MAX_LINE_LEN);
+    memset(msg, 0, sizeof(msg));
 
     if(fpr==NULL){
         sprintf(msg, "No such file: %s", file);
@@ -137,14 +137,14 @@ int send_file(int socket, char *file) {
                 return -1;
             }
             
-            if (send(socket, msg, length, 0) < 0) {
+            if (send(socket, line, length, 0) < 0) {
                 return -1;
             }
 
             memset(line, 0, sizeof(line));
         }
         fclose(fpr);
-        strncpy(msg, "Complete read data", 19);
+        strncpy(msg, "Complete send data", 19);
     }
     send_message(socket, msg);
     send_end_message(socket);
