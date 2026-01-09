@@ -53,8 +53,6 @@ int send_file(int socket, char *file) {
         sprintf(msg, "No such file: %s", file);
     } else {
         while(fgets(line,1025,fpr)!=NULL){
-            subst(line,'\n','\0');
-
             send_content(socket, line, TYPE_FILE);
 
             memset(line, 0, sizeof(line));
@@ -89,7 +87,7 @@ int recv_file(int socket, char *file) {
         recv(socket, buffer, length, MSG_WAITALL);
         buffer[length] = '\0';
 
-        fprintf(fpw, "%s\n", buffer);
+        fprintf(fpw, "%s", buffer);
         free(buffer);
     }
 
