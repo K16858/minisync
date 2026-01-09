@@ -113,12 +113,55 @@ int recv_connection(int socket) {
     return 0;
 }
 
+void send_file(int socket, char *file) {
+    FILE *fpr;
+    fpr = fopen(file,"r");
+    char line[MAX_LINE_LEN+1];
+    char msg[MAX_LINE_LEN+1];
+    memset(msg, 0, MAX_LINE_LEN);
+
+    if(fpr==NULL){
+        sprintf(msg, "No such file: %s", file);
+    }
+    else{
+        while(fgets(line,1025,fpr)!=NULL){
+            subst(line,'\n','\0');
+            int length = strlen(line);
+            enum Content content_type = TYPE_FILE;
+
+            if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
+                return -1;
+            }
+
+            if (send(socket, &length, sizeof(length), 0) < 0) {
+                return -1;
+            }
+            
+            if (send(socket, msg, length, 0) < 0) {
+                return -1;
+            }
+
+            memset(line, 0, sizeof(line));
+        }
+        fclose(fpr);
+        strncpy(msg, "Complete read data", 19);
+    }
+    send_message(socket, msg);
+    send_end_message(socket);
+}
+
 int recv_file(int socket) {
     FILE *fpw;
     fpw = fopen("temp", "wb");
 
     while(1) {
         int length;
+        enum Content content_type;
+
+        recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
+        if (content_type != TYPE_FILE) {
+            break;
+        }
         int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
 
         if (length == 0) {
@@ -132,8 +175,9 @@ int recv_file(int socket) {
         fprintf(fpw, "%s\n", buffer);
         free(buffer);
     }
+
     fclose(fpw);
-    send_message(socket, "Complete write data");
+    send_message(socket, "Complete recieve data");
     send_end_message(socket);
 }
 
@@ -190,6 +234,7 @@ int main(void) {
                 // recv_file(connected_socket);
                 if (content_type == TYPE_FILE) {
                     send_message(connected_socket, "Content type: FILE");
+                    recv_file(connected_socket);
                 } else if (content_type == TYPE_MESSAGE) {
                     send_message(connected_socket, "Content type: MESSAGE");
                 } else if (content_type == NONE) {

@@ -73,7 +73,42 @@ int send_end_message(int socket) {
     return 0;
 }
 
+void send_file(int socket, char *file) {
+    FILE *fpr;
+    fpr = fopen(file,"r");
+    char line[MAX_LINE_LEN+1];
+    char msg[MAX_LINE_LEN+1];
+    memset(msg, 0, MAX_LINE_LEN);
 
+    if(fpr==NULL){
+        sprintf(msg, "No such file: %s", file);
+    }
+    else{
+        while(fgets(line,1025,fpr)!=NULL){
+            subst(line,'\n','\0');
+            int length = strlen(line);
+            enum Content content_type = TYPE_FILE;
+
+            if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
+                return -1;
+            }
+
+            if (send(socket, &length, sizeof(length), 0) < 0) {
+                return -1;
+            }
+            
+            if (send(socket, msg, length, 0) < 0) {
+                return -1;
+            }
+
+            memset(line, 0, sizeof(line));
+        }
+        fclose(fpr);
+        strncpy(msg, "Complete read data", 19);
+    }
+    send_message(socket, msg);
+    send_end_message(socket);
+}
 
 struct addrinfo hints, *res;
 
@@ -141,8 +176,10 @@ int main(int argc, char *argv[]) {
         memset(line, 0, MAX_LEN + 1);
         get_line(line,stdin);
 
-        send_message(s, line);
-        send_end_message(s);
+        send_file(socket, line);
+
+        // send_message(s, line);
+        // send_end_message(s);
 
         int connection_closed = 0;
         int should_quit = 0;
