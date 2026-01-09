@@ -2,7 +2,8 @@
 #define PROTOCOL_H
 
 typedef enum {
-    TYPE_FILE,
+    TYPE_PULL_FILE,
+    TYPE_PUSH_FILE,
     TYPE_MESSAGE,
     NONE
 } Content;

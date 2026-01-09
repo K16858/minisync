@@ -47,13 +47,13 @@ int send_file(int socket, char *file) {
     char msg[MAX_LINE_LEN+1];
     memset(msg, 0, MAX_LINE_LEN);
 
-    send_content(socket, file, TYPE_FILE);
+    send_content(socket, file, TYPE_PUSH_FILE);
 
     if(fpr==NULL){
         sprintf(msg, "No such file: %s", file);
     } else {
         while(fgets(line,1025,fpr)!=NULL){
-            send_content(socket, line, TYPE_FILE);
+            send_content(socket, line, TYPE_PUSH_FILE);
 
             memset(line, 0, sizeof(line));
         }
@@ -74,7 +74,7 @@ int recv_file(int socket, char *file) {
         Content content_type;
 
         recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
-        if (content_type != TYPE_FILE) {
+        if (content_type != TYPE_PUSH_FILE) {
             break;
         }
         int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);

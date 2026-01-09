@@ -41,7 +41,7 @@ int recv_connection(int socket) {
     int count = recv(connect_s, buf, MAX_LINE_LEN, 0);
     if (count > 0) {
         printf("Connected client\n");
-        send(connect_s, "Connected. This is a Server\n", 29, 0);
+        send(connect_s, "Connected. This is a MiniSync Server\n", 29, 0);
         return connect_s;
     }
 
@@ -70,8 +70,10 @@ int main(void) {
                 Content content_type;
                 recv(connected_socket, &content_type, sizeof(content_type), MSG_WAITALL);
 
-                if (content_type == TYPE_FILE) {
-                    printf("Content type: FILE\n");
+                if (content_type == TYPE_PUSH_FILE) {
+                    printf("Content type: PUSH_FILE\n");
+                } else if (content_type == TYPE_PULL_FILE) {
+                    printf("Content type: PULL_FILE\n");
                 } else if (content_type == TYPE_MESSAGE) {
                     printf("Content type: MESSAGE\n");
                 } else if (content_type == NONE) {
@@ -96,9 +98,11 @@ int main(void) {
                 
                 // process
                 // recv_file(connected_socket);
-                if (content_type == TYPE_FILE) {
-                    send_content(connected_socket, "Content type: FILE", TYPE_MESSAGE);
+                if (content_type == TYPE_PUSH_FILE) {
+                    send_content(connected_socket, "Content type: PUSH_FILE", TYPE_MESSAGE);
                     recv_file(connected_socket, buffer);
+                } else if (content_type == TYPE_PULL_FILE) {
+                    send_content(connected_socket, "Content type: PULL_FILE", TYPE_MESSAGE);
                 } else if (content_type == TYPE_MESSAGE) {
                     send_content(connected_socket, "Content type: MESSAGE", TYPE_MESSAGE);
                 } else if (content_type == NONE) {
