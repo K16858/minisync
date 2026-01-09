@@ -1,9 +1,9 @@
 all: client server
 
-client: client.c
+client: client.c protocol.c utils.c
 	gcc client.c protocol.c utils.c -o client -lfl -ly
 
-server: server.c
+server: server.c protocol.c utils.c
 	gcc server.c protocol.c utils.c -o server -lfl -ly
 
 test:
