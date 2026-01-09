@@ -7,97 +7,10 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "protocol.h"
+#include "utils.h"
 
 #define MAX_LINE_LEN 1024
-
-enum Content {
-    TYPE_FILE,
-    TYPE_MESSAGE,
-    NONE
-};
-
-int subst(char *str, char c1, char c2){
-    int c=0;
-    while(*str!='\0'){
-        if(*str==c1){
-            *str=c2;
-            c++;
-        }
-        str++;
-    }
-
-    return c;
-}
-
-void get_line(char *line, FILE *stream){
-    while(1){
-        line[0] = '\0';
-        if(fgets(line,MAX_LINE_LEN+1,stream)==NULL){
-            fprintf(stderr,"Input ERROR\n");
-        }
-        subst(line,'\n','\0');
-        if(line[0]=='\0'){
-            fprintf(stderr,"Input ERROR\n");           
-        }
-        else{
-            break;
-        }
-    }
-}
-
-int send_content(int socket, char *msg, enum Content content_type) {
-    int length = strlen(msg);
-
-    if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
-        return -1;
-    }
-
-    if (send(socket, &length, sizeof(length), 0) < 0) {
-        return -1;
-    }
-    
-    if (send(socket, msg, length, 0) < 0) {
-        return -1;
-    }
-    
-    return 0;
-}
-
-int send_end_message(int socket) {
-    int length = 0;
-    enum Content content_type = NONE;
-
-    send(socket, &content_type, sizeof(content_type), 0);
-    send(socket, &length, sizeof(length), 0);
-    return 0;
-}
-
-int send_file(int socket, char *file) {
-    FILE *fpr;
-    fpr = fopen(file,"rb");
-    char line[MAX_LINE_LEN+1];
-    char msg[MAX_LINE_LEN+1];
-    memset(msg, 0, MAX_LINE_LEN);
-
-    send_content(socket, file, TYPE_FILE);
-
-    if(fpr==NULL){
-        sprintf(msg, "No such file: %s", file);
-    } else {
-        while(fgets(line,1025,fpr)!=NULL){
-            subst(line,'\n','\0');
-
-            send_content(socket, line, TYPE_FILE);
-
-            memset(line, 0, sizeof(line));
-        }
-        fclose(fpr);
-        strncpy(msg, "Complete send data", 19);
-    }
-    send_content(socket, msg, TYPE_MESSAGE);
-    send_end_message(socket);
-}
-
 struct addrinfo hints, *res;
 
 int main(int argc, char *argv[]) {
@@ -174,7 +87,7 @@ int main(int argc, char *argv[]) {
 
         while (1) {
             int length;
-            enum Content content_type;
+            Content content_type;
             recv(s, &content_type, sizeof(content_type), MSG_WAITALL);
 
             int bytes = recv(s, &length, sizeof(length), MSG_WAITALL);

@@ -7,75 +7,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
+#include "protocol.h"
+#include "utils.h"
 
 #define MAX_LINE_LEN 1024
-
 struct addrinfo hints, *res;
-
-enum Content {
-    TYPE_FILE,
-    TYPE_MESSAGE,
-    NONE
-};
-
-int subst(char *str, char c1, char c2){
-    int c=0;
-    while(*str!='\0'){
-        if(*str==c1){
-            *str=c2;
-            c++;
-        }
-        str++;
-    }
-
-    return c;
-}
-
-int send_end_message(int socket) {
-    int length = 0;
-    enum Content content_type = NONE;
-
-    send(socket, &content_type, sizeof(content_type), 0);
-    send(socket, &length, sizeof(length), 0);
-    return 0;
-}
-
-int send_content(int socket, char *msg, enum Content content_type) {
-    int length = strlen(msg);
-
-    if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
-        return -1;
-    }
-
-    if (send(socket, &length, sizeof(length), 0) < 0) {
-        return -1;
-    }
-    
-    if (send(socket, msg, length, 0) < 0) {
-        return -1;
-    }
-    
-    return 0;
-}
-
-int get_message(char *line, int socket) {
-    while(1) {
-        int byte = recv(socket, line, MAX_LINE_LEN, 0);
-
-        if (byte <= 0) {
-            printf("Connection closed\n");
-            return 0;
-        }
-
-        subst(line,'\n','\0');
-        if(line[0]=='\0'){
-            send_content(socket, "InputError", TYPE_MESSAGE);
-            send_end_message(socket);
-        } else {
-            return 1;
-        }
-    }
-}
 
 int start_server() {
     struct sockaddr_in sa;
@@ -112,74 +48,6 @@ int recv_connection(int socket) {
     return 0;
 }
 
-int send_file(int socket, char *file) {
-    FILE *fpr;
-    fpr = fopen(file,"rb");
-    char line[MAX_LINE_LEN+1];
-    char msg[MAX_LINE_LEN+1];
-    memset(msg, 0, sizeof(msg));
-
-    if(fpr==NULL){
-        sprintf(msg, "No such file: %s", file);
-    }
-    else{
-        while(fgets(line,1025,fpr)!=NULL){
-            subst(line,'\n','\0');
-            int length = strlen(line);
-            enum Content content_type = TYPE_FILE;
-
-            if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
-                return -1;
-            }
-
-            if (send(socket, &length, sizeof(length), 0) < 0) {
-                return -1;
-            }
-            
-            if (send(socket, line, length, 0) < 0) {
-                return -1;
-            }
-
-            memset(line, 0, sizeof(line));
-        }
-        fclose(fpr);
-        strncpy(msg, "Complete send data", 19);
-    }
-    send_content(socket, msg, TYPE_MESSAGE);
-    send_end_message(socket);
-}
-
-int recv_file(int socket, char *file) {
-    FILE *fpw;
-    fpw = fopen(file, "wb");
-
-    while(1) {
-        int length;
-        enum Content content_type;
-
-        recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
-        if (content_type != TYPE_FILE) {
-            break;
-        }
-        int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
-
-        if (length == 0) {
-            break;
-        }
-        
-        char *buffer = malloc(length + 1);
-        recv(socket, buffer, length, MSG_WAITALL);
-        buffer[length] = '\0';
-
-        fprintf(fpw, "%s\n", buffer);
-        free(buffer);
-    }
-
-    fclose(fpw);
-    send_content(socket, "Complete recieve data", TYPE_MESSAGE);
-    send_end_message(socket);
-}
-
 int main(void) {
     int socket = start_server();
 
@@ -199,7 +67,7 @@ int main(void) {
             close(socket);
             while (1){
                 int length;
-                enum Content content_type;
+                Content content_type;
                 recv(connected_socket, &content_type, sizeof(content_type), MSG_WAITALL);
 
                 if (content_type == TYPE_FILE) {
@@ -239,7 +107,7 @@ int main(void) {
                     send_content(connected_socket, "Unknown type.", TYPE_MESSAGE);
                 }
                 send_end_message(connected_socket);
-                
+
                 printf("%s\n", buffer);
                 free(buffer);
             }

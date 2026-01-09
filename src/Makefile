@@ -1,10 +1,10 @@
 all: client server
 
 client: client.c
-	gcc client.c -o client -lm
+	gcc client.c protocol.c utils.c -o client -lfl -ly
 
 server: server.c
-	gcc server.c -o server -lm
+	gcc server.c protocol.c utils.c -o server -lfl -ly
 
 test:
 	@bash test.sh
