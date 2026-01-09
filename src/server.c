@@ -40,9 +40,8 @@ int send_end_message(int socket) {
     return 0;
 }
 
-int send_message(int socket, char *msg) {
+int send_content(int socket, char *msg, enum Content content_type) {
     int length = strlen(msg);
-    enum Content content_type = TYPE_MESSAGE;
 
     if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
         return -1;
@@ -70,7 +69,7 @@ int get_message(char *line, int socket) {
 
         subst(line,'\n','\0');
         if(line[0]=='\0'){
-            send_message(socket, "InputError");
+            send_content(socket, "InputError", TYPE_MESSAGE);
             send_end_message(socket);
         } else {
             return 1;
@@ -146,13 +145,13 @@ int send_file(int socket, char *file) {
         fclose(fpr);
         strncpy(msg, "Complete send data", 19);
     }
-    send_message(socket, msg);
+    send_content(socket, msg, TYPE_MESSAGE);
     send_end_message(socket);
 }
 
-int recv_file(int socket) {
+int recv_file(int socket, char *file) {
     FILE *fpw;
-    fpw = fopen("temp", "wb");
+    fpw = fopen(file, "wb");
 
     while(1) {
         int length;
@@ -177,7 +176,7 @@ int recv_file(int socket) {
     }
 
     fclose(fpw);
-    send_message(socket, "Complete recieve data");
+    send_content(socket, "Complete recieve data", TYPE_MESSAGE);
     send_end_message(socket);
 }
 
@@ -227,22 +226,22 @@ int main(void) {
                 recv(connected_socket, buffer, length, MSG_WAITALL);
                 buffer[length] = '\0';
                 
-                
-                printf("%s\n", buffer);
-                free(buffer);
                 // process
                 // recv_file(connected_socket);
                 if (content_type == TYPE_FILE) {
-                    send_message(connected_socket, "Content type: FILE");
-                    recv_file(connected_socket);
+                    send_content(connected_socket, "Content type: FILE", TYPE_MESSAGE);
+                    recv_file(connected_socket, buffer);
                 } else if (content_type == TYPE_MESSAGE) {
-                    send_message(connected_socket, "Content type: MESSAGE");
+                    send_content(connected_socket, "Content type: MESSAGE", TYPE_MESSAGE);
                 } else if (content_type == NONE) {
-                    send_message(connected_socket, "Content type: NONE");
+                    send_content(connected_socket, "Content type: NONE", TYPE_MESSAGE);
                 } else {
-                    send_message(connected_socket, "Unknown type.");
+                    send_content(connected_socket, "Unknown type.", TYPE_MESSAGE);
                 }
                 send_end_message(connected_socket);
+                
+                printf("%s\n", buffer);
+                free(buffer);
             }
             close(connected_socket);
             exit(0);

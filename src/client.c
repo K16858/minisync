@@ -45,9 +45,8 @@ void get_line(char *line, FILE *stream){
     }
 }
 
-int send_message(int socket, char *msg) {
+int send_content(int socket, char *msg, enum Content content_type) {
     int length = strlen(msg);
-    enum Content content_type = TYPE_MESSAGE;
 
     if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
         return -1;
@@ -80,32 +79,22 @@ int send_file(int socket, char *file) {
     char msg[MAX_LINE_LEN+1];
     memset(msg, 0, MAX_LINE_LEN);
 
+    send_content(socket, file, TYPE_FILE);
+
     if(fpr==NULL){
         sprintf(msg, "No such file: %s", file);
-    } else{
+    } else {
         while(fgets(line,1025,fpr)!=NULL){
             subst(line,'\n','\0');
-            int length = strlen(line);
-            enum Content content_type = TYPE_FILE;
 
-            if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
-                return -1;
-            }
-
-            if (send(socket, &length, sizeof(length), 0) < 0) {
-                return -1;
-            }
-            
-            if (send(socket, line, length, 0) < 0) {
-                return -1;
-            }
+            send_content(socket, line, TYPE_FILE);
 
             memset(line, 0, sizeof(line));
         }
         fclose(fpr);
         strncpy(msg, "Complete send data", 19);
     }
-    send_message(socket, msg);
+    send_content(socket, msg, TYPE_MESSAGE);
     send_end_message(socket);
 }
 
@@ -177,7 +166,7 @@ int main(int argc, char *argv[]) {
 
         send_file(s, line);
 
-        // send_message(s, line);
+        // send_content(s, line);
         // send_end_message(s);
 
         int connection_closed = 0;
