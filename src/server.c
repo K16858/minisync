@@ -113,7 +113,7 @@ int recv_connection(int socket) {
     return 0;
 }
 
-void send_file(int socket, char *file) {
+int send_file(int socket, char *file) {
     FILE *fpr;
     fpr = fopen(file,"r");
     char line[MAX_LINE_LEN+1];

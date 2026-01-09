@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MAX_LEN 1024
+#define MAX_LINE_LEN 1024
 
 enum Content {
     TYPE_FILE,
@@ -32,7 +32,7 @@ int subst(char *str, char c1, char c2){
 void get_line(char *line, FILE *stream){
     while(1){
         line[0] = '\0';
-        if(fgets(line,MAX_LEN+1,stream)==NULL){
+        if(fgets(line,MAX_LINE_LEN+1,stream)==NULL){
             fprintf(stderr,"Input ERROR\n");
         }
         subst(line,'\n','\0');
@@ -73,7 +73,7 @@ int send_end_message(int socket) {
     return 0;
 }
 
-void send_file(int socket, char *file) {
+int send_file(int socket, char *file) {
     FILE *fpr;
     fpr = fopen(file,"r");
     char line[MAX_LINE_LEN+1];
@@ -117,11 +117,11 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM; /* TCP */
     hints.ai_family = AF_INET; /* IPv4 */
 
-    char buf[MAX_LEN];
+    char buf[MAX_LINE_LEN];
     char *msg = "TEST";
     int stdo = 1;
-    char hostname_buf[MAX_LEN];
-    char port_buf[MAX_LEN];
+    char hostname_buf[MAX_LINE_LEN];
+    char port_buf[MAX_LINE_LEN];
     char *hostname = hostname_buf;
     char *port = port_buf;
 
@@ -162,21 +162,21 @@ int main(int argc, char *argv[]) {
         printf("Send\n");
     }
 
-    int count = recv(s, buf, MAX_LEN, 0);
+    int count = recv(s, buf, MAX_LINE_LEN, 0);
     if (count > 0) {
         printf("Recv: %s\n", buf);
     } else {
         printf("Faild");
     }
 
-    char line[MAX_LEN + 1];
-    memset(line, 0, MAX_LEN + 1);
+    char line[MAX_LINE_LEN + 1];
+    memset(line, 0, MAX_LINE_LEN + 1);
     
     while (1){
-        memset(line, 0, MAX_LEN + 1);
+        memset(line, 0, MAX_LINE_LEN + 1);
         get_line(line,stdin);
 
-        send_file(socket, line);
+        send_file(s, line);
 
         // send_message(s, line);
         // send_end_message(s);
