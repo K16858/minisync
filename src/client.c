@@ -77,7 +77,14 @@ int main(int argc, char *argv[]) {
         memset(line, 0, MAX_LINE_LEN + 1);
         get_line(line,stdin);
 
-        send_file(s, line);
+        // if (request_file_op(s, line, TYPE_PUSH_FILE)) {
+        //     send_file(s, line);
+        // }
+        if (request_file_op(s, line, TYPE_PULL_FILE)) {
+            recv_file(s, line);
+        }
+
+        // send_file(s, line);
 
         // send_content(s, line);
         // send_end_message(s);

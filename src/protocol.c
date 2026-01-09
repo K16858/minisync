@@ -97,7 +97,9 @@ int recv_file(int socket, char *file) {
 }
 
 int request_file_op(int socket, char *file, Content content_type) {
+    int length;
     send_content(socket, file, content_type);
+    
     recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
     if (content_type != content_type) {
         return 0;
