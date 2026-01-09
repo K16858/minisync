@@ -95,3 +95,29 @@ int recv_file(int socket, char *file) {
     send_content(socket, "Complete recieve data", TYPE_MESSAGE);
     send_end_message(socket);
 }
+
+int request_file_op(int socket, char *file, Content content_type) {
+    send_content(socket, file, content_type);
+    recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
+    if (content_type != content_type) {
+        return 0;
+    }
+
+    int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
+    if (bytes <= 0) {
+        return 0;
+    }
+    if (length == 0) {
+        return 0;
+    }
+    
+    char *buffer = malloc(length + 1);
+    recv(socket, buffer, length, MSG_WAITALL);
+    buffer[length] = '\0';
+
+    if (strncmp(buffer, "[ACCEPT]", 9) == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
