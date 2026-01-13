@@ -19,25 +19,43 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_STREAM; /* TCP */
     hints.ai_family = AF_INET; /* IPv4 */
 
+    char arg_buf[MAX_LINE_LEN];
+    char *arg = arg_buf;
+    char file_path_buf[MAX_LINE_LEN];
+    char *file_path = file_path_buf;
     char buf[MAX_LINE_LEN];
     char *msg = "TEST";
-    int stdo = 1;
     char hostname_buf[MAX_LINE_LEN];
     char port_buf[MAX_LINE_LEN];
     char *hostname = hostname_buf;
     char *port = port_buf;
 
     if(argc > 1) {
-        hostname = argv[1];
+        arg = argv[1];
     } else {
-        hostname = "localhost";
+        arg = "-v";
     }
 
-    if(argc > 2) {
-        port = argv[2];
+    if (argc > 2) {
+        file_path = argv[2];
     } else {
-        port = "61001";
+        file_path = NULL;
     }
+
+    // if(argc > 1) {
+    //     hostname = argv[1];
+    // } else {
+    //     hostname = "localhost";
+    // }
+
+    // if(argc > 2) {
+    //     port = argv[2];
+    // } else {
+    //     port = "61001";
+    // }
+
+    hostname = "localhost";
+    port = "61001";
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
 
@@ -48,23 +66,23 @@ int main(int argc, char *argv[]) {
         printf("GetAddrInfo\n");
     }
 
-    int s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    int connected_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
-    if(connect(s, res->ai_addr, res->ai_addrlen)) {
+    if(connect(connected_socket, res->ai_addr, res->ai_addrlen)) {
         printf("Error\n");
         return 1;        
     } else {
         printf("Connected\n");
     }
 
-    if(send(s, msg, 20, 0) < 0) {
+    if(send(connected_socket, msg, 20, 0) < 0) {
         printf("Error\n");
         return 1;
     } else {
         printf("Send\n");
     }
 
-    int count = recv(s, buf, MAX_LINE_LEN, 0);
+    int count = recv(connected_socket, buf, MAX_LINE_LEN, 0);
     if (count > 0) {
         printf("Recv: %s\n", buf);
     } else {
@@ -73,50 +91,50 @@ int main(int argc, char *argv[]) {
 
     char line[MAX_LINE_LEN + 1];
     memset(line, 0, MAX_LINE_LEN + 1);
-    
-    while (1){
-        memset(line, 0, MAX_LINE_LEN + 1);
-        get_line(line,stdin);
 
-        // if (request_file_op(s, line, TYPE_PUSH_FILE)) {
-        //     send_file(s, line);
-        // }
-        if (request_file_op(s, line, TYPE_PULL_FILE)) {
-            recv_file(s, line);
+    int connection_closed = 0;
+    int should_quit = 0;
+
+    // get_line(line,stdin);
+
+    if (strncmp(arg, "-v", 3) == 0) {
+        printf("MiniSync Version 0.1.0\n");
+    } else if (strncmp(arg, "pull", 5) == 0) {
+        if (request_file_op(connected_socket, file_path, TYPE_PULL_FILE)) {
+            recv_file(connected_socket, file_path);
+        }
+    } else if (strncmp(arg, "push", 5) == 0) {
+        if (request_file_op(connected_socket, file_path, TYPE_PUSH_FILE)) {
+            printf("push file: %s\n", file_path);
+            send_file(connected_socket, file_path);
+        }
+    } else {
+        printf("Unknown argument\n");
+    }
+
+    while (1) {
+        int length;
+        Content content_type;
+        recv(connected_socket, &content_type, sizeof(content_type), MSG_WAITALL);
+
+        int bytes = recv(connected_socket, &length, sizeof(length), MSG_WAITALL);
+        if (bytes <= 0) {
+            printf("Connection closed\n");
+            connection_closed = 1;
+            break;
         }
 
-        // send_file(s, line);
-
-        // send_content(s, line);
-        // send_end_message(s);
-
-        int connection_closed = 0;
-        int should_quit = 0;
-
-        while (1) {
-            int length;
-            Content content_type;
-            recv(s, &content_type, sizeof(content_type), MSG_WAITALL);
-
-            int bytes = recv(s, &length, sizeof(length), MSG_WAITALL);
-            if (bytes <= 0) {
-                printf("Connection closed\n");
-                connection_closed = 1;
-                break;
-            }
-
-            if (length == 0) {
-                should_quit = 1;
-                break;
-            }
-
-            char *buffer = malloc(length + 1);
-            recv(s, buffer, length, MSG_WAITALL);
-            buffer[length] = '\0';
-
-            printf("%s\n", buffer);
-            free(buffer);
+        if (length == 0) {
+            should_quit = 1;
+            break;
         }
+
+        char *buffer = malloc(length + 1);
+        recv(connected_socket, buffer, length, MSG_WAITALL);
+        buffer[length] = '\0';
+
+        printf("%s\n", buffer);
+        free(buffer);
 
         if (connection_closed || should_quit) {
             break;

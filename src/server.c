@@ -97,9 +97,7 @@ int main(void) {
                 buffer[length] = '\0';
                 
                 // process
-                // recv_file(connected_socket);
                 if (content_type == TYPE_PUSH_FILE) {
-                    // send_content(connected_socket, "Content type: PUSH_FILE", TYPE_MESSAGE);
                     send_content(connected_socket, "[ACCEPT]", TYPE_PUSH_FILE);
                     recv_file(connected_socket, buffer);
                 } else if (content_type == TYPE_PULL_FILE) {
