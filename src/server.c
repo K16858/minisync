@@ -41,7 +41,7 @@ int recv_connection(int socket) {
     int count = recv(connect_s, buf, MAX_LINE_LEN, 0);
     if (count > 0) {
         printf("Connected client\n");
-        send(connect_s, "Connected. This is a MiniSync Server\n", 29, 0);
+        send(connect_s, "Connected. This is a MiniSync Server\n", 38, 0);
         return connect_s;
     }
 
