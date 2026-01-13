@@ -1,8 +1,11 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#define MAX_LINE_LEN 1024
+#define MAX_DATA 500
+
 struct file_entry {
-    char name[256];
+    char name[MAX_LINE_LEN+1];
     int  size;
     int  mtime;
 };

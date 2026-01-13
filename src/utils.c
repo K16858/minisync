@@ -42,23 +42,30 @@ int get_file_list(char *base_dir, struct file_entry entries[]) {
     DIR *dir = opendir(base_dir);
     struct dirent *ent;
 
+    int file_count = 0;
+
     while ((ent = readdir(dir)) != NULL) {
-        if (strcmp(ent->d_name, ".") == 0 ||
-            strcmp(ent->d_name, "..") == 0)
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
             continue;
 
         char path[PATH_MAX];
-        snprintf(path, sizeof(path),
-                "%s/%s", base_dir, ent->d_name);
+        snprintf(path, sizeof(path), "%s/%s", base_dir, ent->d_name);
 
         struct stat st;
-        if (stat(path, &st) < 0)
+        if (stat(path, &st) < 0) {
             continue;
+        }
 
-        if (!S_ISREG(st.st_mode))
+        if (!S_ISREG(st.st_mode)) {
             continue;
+        }
+        
+        strncpy(entries[file_count].name, ent->d_name, MAX_LINE_LEN);
+        entries[file_count].size = st.st_size;
+        entries[file_count].mtime = st.st_mtime;
+        // printf("file: %s size=%d mtime=%d\n",ent->d_name, st.st_size, st.st_mtime);
 
-        printf("file: %s size=%ld mtime=%ld\n",ent->d_name, st.st_size, st.st_mtime);
+        file_count++;
     }
 
     closedir(dir);

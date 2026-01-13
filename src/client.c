@@ -11,6 +11,7 @@
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
+#define MAX_DATA 500
 struct addrinfo hints, *res;
 
 int main(int argc, char *argv[]) {
@@ -72,6 +73,11 @@ int main(int argc, char *argv[]) {
 
     char line[MAX_LINE_LEN + 1];
     memset(line, 0, MAX_LINE_LEN + 1);
+
+    char *base_dir = "./";
+    struct file_entry entries[1000];
+    get_file_list(base_dir, entries);
+    printf("%s\n", entries[0].name);
     
     while (1){
         memset(line, 0, MAX_LINE_LEN + 1);
