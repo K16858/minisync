@@ -47,8 +47,6 @@ int send_file(int socket, char *file) {
     char msg[MAX_LINE_LEN+1];
     memset(msg, 0, MAX_LINE_LEN);
 
-    send_content(socket, file, TYPE_PUSH_FILE);
-
     if(fpr==NULL){
         sprintf(msg, "No such file: %s", file);
     } else {
@@ -63,7 +61,6 @@ int send_file(int socket, char *file) {
     send_content(socket, msg, TYPE_MESSAGE);
     send_end_message(socket);
 }
-
 
 int recv_file(int socket, char *file) {
     FILE *fpw;
