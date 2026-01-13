@@ -2,7 +2,6 @@
 #define UTILS_H
 
 #define MAX_LINE_LEN 1024
-#define MAX_DATA 500
 
 struct file_entry {
     char name[MAX_LINE_LEN+1];
