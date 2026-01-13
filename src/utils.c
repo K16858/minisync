@@ -38,7 +38,7 @@ void get_line(char *line, FILE *stream) {
     }
 }
 
-int get_file_list(char *dir, struct file_entry entries[]) {
+int get_file_list(char *base_dir, struct file_entry entries[]) {
     DIR *dir = opendir(base_dir);
     struct dirent *ent;
 
