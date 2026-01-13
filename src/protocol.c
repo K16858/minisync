@@ -72,9 +72,9 @@ int send_file_list(int socket) {
 
     if (num_files > 0) {
         for (int i=0;i<num_files;i++) {
-            send_content(socket, entries->name, TYPE_FILE_LIST);
-            send_content(socket, entries->size, TYPE_FILE_LIST);
-            send_content(socket, entries->mtime, TYPE_FILE_LIST);
+            send_content(socket, entries[i]->name, TYPE_FILE_LIST);
+            send_content(socket, entries[i]->size, TYPE_FILE_LIST);
+            send_content(socket, entries[i]->mtime, TYPE_FILE_LIST);
         }
         strncpy(msg, "Complete send data", 19);
     } else {
