@@ -12,6 +12,7 @@
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
+#define MAX_DATA 500
 
 int send_content(int socket, char *msg, Content content_type) {
     int length = strlen(msg);
@@ -58,6 +59,28 @@ int send_file(int socket, char *file) {
         fclose(fpr);
         strncpy(msg, "Complete send data", 19);
     }
+    send_content(socket, msg, TYPE_MESSAGE);
+    send_end_message(socket);
+}
+
+int send_file_list(int socket) {
+    char *base_dir = "./";
+    struct file_entry entries[MAX_DATA];
+    char msg[MAX_LINE_LEN+1];
+
+    int num_files = get_file_list(base_dir, entries);
+
+    if (num_files > 0) {
+        for (int i=0;i<num_files;i++) {
+            send_content(socket, entries->name, TYPE_FILE_LIST);
+            send_content(socket, entries->size, TYPE_FILE_LIST);
+            send_content(socket, entries->mtime, TYPE_FILE_LIST);
+        }
+        strncpy(msg, "Complete send data", 19);
+    } else {
+        strncpy(msg, "Failed send data", 17);
+    }
+
     send_content(socket, msg, TYPE_MESSAGE);
     send_end_message(socket);
 }
