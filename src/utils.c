@@ -1,6 +1,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h> 
+#include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
@@ -32,4 +36,30 @@ void get_line(char *line, FILE *stream) {
             break;
         }
     }
+}
+
+int get_file_list(char *dir, struct file_entry entries[]) {
+    DIR *dir = opendir(base_dir);
+    struct dirent *ent;
+
+    while ((ent = readdir(dir)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 ||
+            strcmp(ent->d_name, "..") == 0)
+            continue;
+
+        char path[PATH_MAX];
+        snprintf(path, sizeof(path),
+                "%s/%s", base_dir, ent->d_name);
+
+        struct stat st;
+        if (stat(path, &st) < 0)
+            continue;
+
+        if (!S_ISREG(st.st_mode))
+            continue;
+
+        printf("file: %s size=%ld mtime=%ld\n",ent->d_name, st.st_size, st.st_mtime);
+    }
+
+    closedir(dir);
 }
