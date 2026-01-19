@@ -8,6 +8,8 @@ typedef enum {
     TYPE_PUSH_FILE,
     TYPE_FILE_LIST,
     TYPE_MESSAGE,
+    TYPE_ERROR,
+    TYPE_DONE,
     NONE
 } Content;
 
@@ -20,5 +22,6 @@ int recv_file_list(int socket, struct file_entry entries[]);
 int request_file_op(int socket, char *file, Content content_type);
 int send_hello(int socket);
 int recv_hello_ack(int socket);
+int send_error(int socket, char *msg);
 
 #endif

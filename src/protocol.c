@@ -34,7 +34,7 @@ int send_content(int socket, char *msg, Content content_type) {
 
 int send_end_message(int socket) {
     int length = 0;
-    Content content_type = NONE;
+    Content content_type = TYPE_DONE;
 
     send(socket, &content_type, sizeof(content_type), 0);
     send(socket, &length, sizeof(length), 0);
@@ -118,10 +118,10 @@ int recv_file(int socket, char *file) {
 
 int request_file_op(int socket, char *file, Content content_type) {
     int length;
+    Content response_type;
     send_content(socket, file, content_type);
     
-    recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
-    if (content_type != content_type) {
+    if (recv(socket, &response_type, sizeof(response_type), MSG_WAITALL) <= 0) {
         return 0;
     }
 
@@ -137,11 +137,9 @@ int request_file_op(int socket, char *file, Content content_type) {
     recv(socket, buffer, length, MSG_WAITALL);
     buffer[length] = '\0';
 
-    if (strncmp(buffer, "[ACCEPT]", 9) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
+    int accepted = (response_type == content_type) && (strncmp(buffer, "[ACCEPT]", 9) == 0);
+    free(buffer);
+    return accepted;
 }
 
 int send_hello(int socket) {
@@ -166,4 +164,8 @@ int recv_hello_ack(int socket) {
     }
 
     return (content_type == TYPE_HELLO_ACK);
+}
+
+int send_error(int socket, char *msg) {
+    return send_content(socket, msg, TYPE_ERROR);
 }

@@ -91,6 +91,10 @@ int main(void) {
                     printf("Content type: PULL_FILE\n");
                 } else if (content_type == TYPE_MESSAGE) {
                     printf("Content type: MESSAGE\n");
+                } else if (content_type == TYPE_ERROR) {
+                    printf("Content type: ERROR\n");
+                } else if (content_type == TYPE_DONE) {
+                    printf("Content type: DONE\n");
                 } else if (content_type == NONE) {
                     printf("Content type: NONE\n");
                 } else {
@@ -103,7 +107,7 @@ int main(void) {
                     break;
                 }
 
-                if (length == 0) {
+                if (content_type == TYPE_DONE || length == 0) {
                     break;
                 }
 
@@ -120,10 +124,12 @@ int main(void) {
                     send_file(connected_socket, buffer);
                 } else if (content_type == TYPE_MESSAGE) {
                     send_content(connected_socket, "Content type: MESSAGE", TYPE_MESSAGE);
-                } else if (content_type == NONE) {
-                    send_content(connected_socket, "Content type: NONE", TYPE_MESSAGE);
+                } else if (content_type == TYPE_ERROR) {
+                    send_content(connected_socket, "Content type: ERROR", TYPE_MESSAGE);
+                } else if (content_type == TYPE_DONE) {
+                    send_content(connected_socket, "Content type: DONE", TYPE_MESSAGE);
                 } else {
-                    send_content(connected_socket, "Unknown type.", TYPE_MESSAGE);
+                    send_error(connected_socket, "Unknown type.");
                 }
                 send_end_message(connected_socket);
 

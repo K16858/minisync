@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        if (length == 0) {
+        if (content_type == TYPE_DONE || length == 0) {
             should_quit = 1;
             break;
         }
