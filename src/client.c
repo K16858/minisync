@@ -23,8 +23,6 @@ int main(int argc, char *argv[]) {
     char *arg = arg_buf;
     char file_path_buf[MAX_LINE_LEN];
     char *file_path = file_path_buf;
-    char buf[MAX_LINE_LEN];
-    char *msg = "TEST";
     char hostname_buf[MAX_LINE_LEN];
     char port_buf[MAX_LINE_LEN];
     char *hostname = hostname_buf;
@@ -59,34 +57,28 @@ int main(int argc, char *argv[]) {
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
 
-    if (getaddrinfo(hostname, port, &hints, &res)) {
-        printf("Error\n");
+    int gai_err = getaddrinfo(hostname, port, &hints, &res);
+    if (gai_err) {
+        printf("GetAddrInfo Error: %s\n", gai_strerror(gai_err));
         return 1;
     } else {
         printf("GetAddrInfo\n");
     }
 
     int connected_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (connected_socket < 0) {
+        printf("Socket Error\n");
+        freeaddrinfo(res);
+        return 1;
+    }
 
     if(connect(connected_socket, res->ai_addr, res->ai_addrlen)) {
         printf("Error\n");
+        close(connected_socket);
+        freeaddrinfo(res);
         return 1;        
     } else {
         printf("Connected\n");
-    }
-
-    if(send(connected_socket, msg, 20, 0) < 0) {
-        printf("Error\n");
-        return 1;
-    } else {
-        printf("Send\n");
-    }
-
-    int count = recv(connected_socket, buf, MAX_LINE_LEN, 0);
-    if (count > 0) {
-        printf("Recv: %s\n", buf);
-    } else {
-        printf("Faild");
     }
 
     char line[MAX_LINE_LEN + 1];
@@ -100,10 +92,22 @@ int main(int argc, char *argv[]) {
     if (strncmp(arg, "-v", 3) == 0) {
         printf("MiniSync Version 0.1.0\n");
     } else if (strncmp(arg, "pull", 5) == 0) {
+        if (file_path == NULL) {
+            printf("File path required for pull\n");
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PULL_FILE)) {
             recv_file(connected_socket, file_path);
         }
     } else if (strncmp(arg, "push", 5) == 0) {
+        if (file_path == NULL) {
+            printf("File path required for push\n");
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PUSH_FILE)) {
             printf("push file: %s\n", file_path);
             send_file(connected_socket, file_path);
@@ -141,6 +145,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    close(connected_socket);
     freeaddrinfo(res);
 
     return 0;
