@@ -2,6 +2,8 @@
 #define PROTOCOL_H
 
 typedef enum {
+    TYPE_HELLO,
+    TYPE_HELLO_ACK,
     TYPE_PULL_FILE,
     TYPE_PUSH_FILE,
     TYPE_FILE_LIST,
@@ -16,5 +18,7 @@ int send_file_list(int socket);
 int recv_file(int socket, char *file);
 int recv_file_list(int socket, struct file_entry entries[]);
 int request_file_op(int socket, char *file, Content content_type);
+int send_hello(int socket);
+int recv_hello_ack(int socket);
 
 #endif

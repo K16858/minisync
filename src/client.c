@@ -81,6 +81,19 @@ int main(int argc, char *argv[]) {
         printf("Connected\n");
     }
 
+    if (send_hello(connected_socket) < 0) {
+        printf("Hello send error\n");
+        close(connected_socket);
+        freeaddrinfo(res);
+        return 1;
+    }
+    if (!recv_hello_ack(connected_socket)) {
+        printf("Hello ack error\n");
+        close(connected_socket);
+        freeaddrinfo(res);
+        return 1;
+    }
+
     char line[MAX_LINE_LEN + 1];
     memset(line, 0, MAX_LINE_LEN + 1);
 

@@ -35,17 +35,11 @@ int start_server() {
 }
 
 int recv_connection(int socket) {
-    char buf[MAX_LINE_LEN+1];
-
     int connect_s = accept(socket, NULL, NULL);
-    int count = recv(connect_s, buf, MAX_LINE_LEN, 0);
-    if (count > 0) {
+    if (connect_s >= 0) {
         printf("Connected client\n");
-        send(connect_s, "Connected. This is a MiniSync Server\n", 38, 0);
-        return connect_s;
     }
-
-    return 0;
+    return connect_s;
 }
 
 int main(void) {
@@ -65,6 +59,27 @@ int main(void) {
         } else if (pid == 0) {
             // Child process
             close(socket);
+            int hello_len;
+            Content hello_type;
+            if (recv(connected_socket, &hello_type, sizeof(hello_type), MSG_WAITALL) <= 0) {
+                close(connected_socket);
+                exit(0);
+            }
+            if (recv(connected_socket, &hello_len, sizeof(hello_len), MSG_WAITALL) <= 0) {
+                close(connected_socket);
+                exit(0);
+            }
+            if (hello_len > 0) {
+                char *hello_buf = malloc(hello_len + 1);
+                recv(connected_socket, hello_buf, hello_len, MSG_WAITALL);
+                hello_buf[hello_len] = '\0';
+                free(hello_buf);
+            }
+            if (hello_type != TYPE_HELLO) {
+                close(connected_socket);
+                exit(0);
+            }
+            send_content(connected_socket, "HELLO_ACK", TYPE_HELLO_ACK);
             while (1){
                 int length;
                 Content content_type;

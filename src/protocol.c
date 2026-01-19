@@ -143,3 +143,27 @@ int request_file_op(int socket, char *file, Content content_type) {
         return 0;
     }
 }
+
+int send_hello(int socket) {
+    return send_content(socket, "HELLO", TYPE_HELLO);
+}
+
+int recv_hello_ack(int socket) {
+    int length;
+    Content content_type;
+
+    if (recv(socket, &content_type, sizeof(content_type), MSG_WAITALL) <= 0) {
+        return 0;
+    }
+    if (recv(socket, &length, sizeof(length), MSG_WAITALL) <= 0) {
+        return 0;
+    }
+    if (length > 0) {
+        char *buffer = malloc(length + 1);
+        recv(socket, buffer, length, MSG_WAITALL);
+        buffer[length] = '\0';
+        free(buffer);
+    }
+
+    return (content_type == TYPE_HELLO_ACK);
+}
