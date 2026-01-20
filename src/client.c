@@ -58,6 +58,11 @@ int main(int argc, char *argv[]) {
             if (i + 1 < argc) {
                 file_path = argv[++i];
             }
+        } else if (strcmp(argv[i], "init") == 0) {
+            return 0;
+        } else {
+            print_usage(argv[0]);
+            return 1;
         }
     }
 
