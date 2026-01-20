@@ -27,6 +27,42 @@ static void print_usage(const char *prog) {
     printf("  %s -h | --help\n", prog);
 }
 
+static void bytes_to_hex(const unsigned char *bytes, size_t len, char *out, size_t out_len) {
+    static const char hex[] = "0123456789abcdef";
+    size_t needed = len * 2 + 1;
+    if (out_len < needed) {
+        return;
+    }
+    for (size_t i = 0; i < len; i++) {
+        out[i * 2] = hex[(bytes[i] >> 4) & 0x0F];
+        out[i * 2 + 1] = hex[bytes[i] & 0x0F];
+    }
+    out[len * 2] = '\0';
+}
+
+static int generate_random_hex(char *out, size_t bytes_len) {
+    unsigned char buf[64];
+    if (bytes_len > sizeof(buf)) {
+        return -1;
+    }
+
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd >= 0) {
+        ssize_t r = read(fd, buf, bytes_len);
+        close(fd);
+        if (r == (ssize_t)bytes_len) {
+            bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
+            return 0;
+        }
+    }
+
+    for (size_t i = 0; i < bytes_len; i++) {
+        buf[i] = (unsigned char)(rand() & 0xFF);
+    }
+    bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
+    return 0;
+}
+
 static int init_space() {
     const char *dir = ".msync";
     struct stat st;
@@ -43,9 +79,9 @@ static int init_space() {
 
     char id[33];
     char token[33];
-    for (int i = 0; i < 32; i++) {
-        id[i] = "0123456789abcdef"[rand() % 16];
-        token[i] = "0123456789abcdef"[rand() % 16];
+    if (generate_random_hex(id, 16) < 0 || generate_random_hex(token, 16) < 0) {
+        printf("Failed to generate id/token\n");
+        return 1;
     }
 
     char name[64] = "msync-space";
