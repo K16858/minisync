@@ -14,18 +14,44 @@
 #define MAX_LINE_LEN 1024
 #define MAX_DATA 500
 
+static int send_all(int socket, const void *buf, int length) {
+    int sent = 0;
+    const char *p = (const char *)buf;
+    while (sent < length) {
+        int n = send(socket, p + sent, length - sent, 0);
+        if (n <= 0) {
+            return -1;
+        }
+        sent += n;
+    }
+    return sent;
+}
+
+static int recv_all(int socket, void *buf, int length) {
+    int received = 0;
+    char *p = (char *)buf;
+    while (received < length) {
+        int n = recv(socket, p + received, length - received, 0);
+        if (n <= 0) {
+            return -1;
+        }
+        received += n;
+    }
+    return received;
+}
+
 int send_content(int socket, char *msg, Content content_type) {
     int length = strlen(msg);
 
-    if (send(socket, &content_type, sizeof(content_type), 0) < 0) {
+    if (send_all(socket, &content_type, sizeof(content_type)) < 0) {
         return -1;
     }
 
-    if (send(socket, &length, sizeof(length), 0) < 0) {
+    if (send_all(socket, &length, sizeof(length)) < 0) {
         return -1;
     }
     
-    if (send(socket, msg, length, 0) < 0) {
+    if (send_all(socket, msg, length) < 0) {
         return -1;
     }
     
@@ -36,31 +62,44 @@ int send_end_message(int socket) {
     int length = 0;
     Content content_type = TYPE_DONE;
 
-    send(socket, &content_type, sizeof(content_type), 0);
-    send(socket, &length, sizeof(length), 0);
+    send_all(socket, &content_type, sizeof(content_type));
+    send_all(socket, &length, sizeof(length));
     return 0;
 }
 
 int send_file(int socket, char *file) {
     FILE *fpr;
-    fpr = fopen(file,"rb");
-    char line[MAX_LINE_LEN+1];
-    char msg[MAX_LINE_LEN+1];
-    memset(msg, 0, MAX_LINE_LEN);
-
-    if(fpr==NULL){
-        sprintf(msg, "No such file: %s", file);
-    } else {
-        while(fgets(line,1025,fpr)!=NULL){
-            send_content(socket, line, TYPE_PUSH_FILE);
-
-            memset(line, 0, sizeof(line));
-        }
-        fclose(fpr);
-        strncpy(msg, "Complete send data", 19);
+    fpr = fopen(file, "rb");
+    if (fpr == NULL) {
+        char msg[MAX_LINE_LEN + 1];
+        snprintf(msg, sizeof(msg), "No such file: %s", file);
+        send_error(socket, msg);
+        send_end_message(socket);
+        return -1;
     }
-    send_content(socket, msg, TYPE_MESSAGE);
+
+    unsigned char buffer[4096];
+    size_t nread;
+    while ((nread = fread(buffer, 1, sizeof(buffer), fpr)) > 0) {
+        Content content_type = TYPE_PUSH_FILE;
+        int length = (int)nread;
+        if (send_all(socket, &content_type, sizeof(content_type)) < 0) {
+            fclose(fpr);
+            return -1;
+        }
+        if (send_all(socket, &length, sizeof(length)) < 0) {
+            fclose(fpr);
+            return -1;
+        }
+        if (send_all(socket, buffer, length) < 0) {
+            fclose(fpr);
+            return -1;
+        }
+    }
+
+    fclose(fpr);
     send_end_message(socket);
+    return 0;
 }
 
 int send_file_list(int socket) {
@@ -88,32 +127,40 @@ int send_file_list(int socket) {
 int recv_file(int socket, char *file) {
     FILE *fpw;
     fpw = fopen(file, "wb");
+    if (fpw == NULL) {
+        return -1;
+    }
 
     while(1) {
         int length;
         Content content_type;
 
-        recv(socket, &content_type, sizeof(content_type), MSG_WAITALL);
-        if (content_type != TYPE_PUSH_FILE) {
+        if (recv_all(socket, &content_type, sizeof(content_type)) < 0) {
             break;
         }
-        int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
-
-        if (length == 0) {
+        if (recv_all(socket, &length, sizeof(length)) < 0) {
             break;
         }
-        
-        char *buffer = malloc(length + 1);
-        recv(socket, buffer, length, MSG_WAITALL);
-        buffer[length] = '\0';
 
-        fprintf(fpw, "%s", buffer);
+        if (content_type == TYPE_DONE || length == 0) {
+            break;
+        }
+
+        char *buffer = malloc(length);
+        if (recv_all(socket, buffer, length) < 0) {
+            free(buffer);
+            break;
+        }
+
+        if (content_type == TYPE_PUSH_FILE) {
+            fwrite(buffer, 1, length, fpw);
+        }
         free(buffer);
     }
 
     fclose(fpw);
-    send_content(socket, "Complete recieve data", TYPE_MESSAGE);
     send_end_message(socket);
+    return 0;
 }
 
 int request_file_op(int socket, char *file, Content content_type) {
@@ -121,11 +168,11 @@ int request_file_op(int socket, char *file, Content content_type) {
     Content response_type;
     send_content(socket, file, content_type);
     
-    if (recv(socket, &response_type, sizeof(response_type), MSG_WAITALL) <= 0) {
+    if (recv_all(socket, &response_type, sizeof(response_type)) <= 0) {
         return 0;
     }
 
-    int bytes = recv(socket, &length, sizeof(length), MSG_WAITALL);
+    int bytes = recv_all(socket, &length, sizeof(length));
     if (bytes <= 0) {
         return 0;
     }
@@ -134,7 +181,7 @@ int request_file_op(int socket, char *file, Content content_type) {
     }
     
     char *buffer = malloc(length + 1);
-    recv(socket, buffer, length, MSG_WAITALL);
+    recv_all(socket, buffer, length);
     buffer[length] = '\0';
 
     int accepted = (response_type == content_type) && (strncmp(buffer, "[ACCEPT]", 9) == 0);
@@ -150,15 +197,15 @@ int recv_hello_ack(int socket) {
     int length;
     Content content_type;
 
-    if (recv(socket, &content_type, sizeof(content_type), MSG_WAITALL) <= 0) {
+    if (recv_all(socket, &content_type, sizeof(content_type)) <= 0) {
         return 0;
     }
-    if (recv(socket, &length, sizeof(length), MSG_WAITALL) <= 0) {
+    if (recv_all(socket, &length, sizeof(length)) <= 0) {
         return 0;
     }
     if (length > 0) {
         char *buffer = malloc(length + 1);
-        recv(socket, buffer, length, MSG_WAITALL);
+        recv_all(socket, buffer, length);
         buffer[length] = '\0';
         free(buffer);
     }
