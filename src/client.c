@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include "protocol.h"
 #include "utils.h"
 
@@ -23,6 +25,65 @@ static void print_usage(const char *prog) {
     printf("  %s connect\n", prog);
     printf("  %s -v | --version\n", prog);
     printf("  %s -h | --help\n", prog);
+}
+
+static int init_space() {
+    const char *dir = ".msync";
+    struct stat st;
+
+    if (stat(dir, &st) == 0) {
+        printf("%s already exists\n", dir);
+        return 1;
+    }
+
+    if (mkdir(dir, 0700) < 0) {
+        printf("Failed to create %s: %s\n", dir, strerror(errno));
+        return 1;
+    }
+
+    char id[33];
+    char token[33];
+    for (int i = 0; i < 32; i++) {
+        id[i] = "0123456789abcdef"[rand() % 16];
+        token[i] = "0123456789abcdef"[rand() % 16];
+    }
+
+    char name[64] = "msync-space";
+    char hostname[64];
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        hostname[sizeof(hostname) - 1] = '\0';
+        snprintf(name, sizeof(name), "%s", hostname);
+    }
+
+    char config_path[PATH_MAX];
+    snprintf(config_path, sizeof(config_path), "%s/config.json", dir);
+    FILE *cfg = fopen(config_path, "w");
+    if (cfg == NULL) {
+        printf("Failed to write %s: %s\n", config_path, strerror(errno));
+        return 1;
+    }
+    fprintf(cfg,
+            "{\n"
+            "  \"id\": \"%s\",\n"
+            "  \"name\": \"%s\",\n"
+            "  \"token\": \"%s\",\n"
+            "  \"port\": %d\n"
+            "}\n",
+            id, name, token, 61001);
+    fclose(cfg);
+
+    char targets_path[PATH_MAX];
+    snprintf(targets_path, sizeof(targets_path), "%s/targets.json", dir);
+    FILE *tgt = fopen(targets_path, "w");
+    if (tgt == NULL) {
+        printf("Failed to write %s: %s\n", targets_path, strerror(errno));
+        return 1;
+    }
+    fprintf(tgt, "[]\n");
+    fclose(tgt);
+
+    printf("Initialized %s\n", dir);
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -62,7 +123,7 @@ int main(int argc, char *argv[]) {
                 file_path = argv[++i];
             }
         } else if (strcmp(argv[i], "init") == 0) {
-            return 0;
+            return init_space();
         } else {
             print_usage(argv[0]);
             return 1;
