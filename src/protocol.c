@@ -124,13 +124,14 @@ int send_file_list(int socket) {
     send_end_message(socket);
 }
 
-int recv_file(int socket, char *file) {
+long long recv_file(int socket, char *file) {
     FILE *fpw;
     fpw = fopen(file, "wb");
     if (fpw == NULL) {
         return -1;
     }
 
+    long long total_written = 0;
     while(1) {
         int length;
         Content content_type;
@@ -154,13 +155,14 @@ int recv_file(int socket, char *file) {
 
         if (content_type == TYPE_PUSH_FILE) {
             fwrite(buffer, 1, length, fpw);
+            total_written += length;
         }
         free(buffer);
     }
 
     fclose(fpw);
     send_end_message(socket);
-    return 0;
+    return total_written;
 }
 
 int request_file_op(int socket, char *file, Content content_type) {
@@ -215,4 +217,38 @@ int recv_hello_ack(int socket) {
 
 int send_error(int socket, char *msg) {
     return send_content(socket, msg, TYPE_ERROR);
+}
+
+int send_meta_size(int socket, long long size) {
+    char msg[MAX_LINE_LEN + 1];
+    snprintf(msg, sizeof(msg), "%lld", size);
+    return send_content(socket, msg, TYPE_META);
+}
+
+int recv_meta_size(int socket, long long *size) {
+    int length;
+    Content content_type;
+
+    if (recv_all(socket, &content_type, sizeof(content_type)) <= 0) {
+        return 0;
+    }
+    if (recv_all(socket, &length, sizeof(length)) <= 0) {
+        return 0;
+    }
+    if (length <= 0) {
+        return 0;
+    }
+
+    char *buffer = malloc(length + 1);
+    recv_all(socket, buffer, length);
+    buffer[length] = '\0';
+
+    if (content_type != TYPE_META) {
+        free(buffer);
+        return 0;
+    }
+
+    *size = atoll(buffer);
+    free(buffer);
+    return 1;
 }

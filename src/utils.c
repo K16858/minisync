@@ -80,3 +80,45 @@ int get_file_list(char *base_dir, struct file_entry entries[]) {
 
     return file_count;
 }
+
+long long get_file_size(const char *path) {
+    struct stat st;
+    if (stat(path, &st) < 0) {
+        return -1;
+    }
+    return (long long)st.st_size;
+}
+
+int create_snapshot(const char *path) {
+    struct stat st;
+    if (stat(path, &st) < 0) {
+        return 0;
+    }
+
+    char backup_path[PATH_MAX];
+    snprintf(backup_path, sizeof(backup_path), "%s.minisync.bak", path);
+
+    FILE *src = fopen(path, "rb");
+    if (src == NULL) {
+        return -1;
+    }
+    FILE *dst = fopen(backup_path, "wb");
+    if (dst == NULL) {
+        fclose(src);
+        return -1;
+    }
+
+    unsigned char buffer[4096];
+    size_t nread;
+    while ((nread = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+        if (fwrite(buffer, 1, nread, dst) != nread) {
+            fclose(src);
+            fclose(dst);
+            return -1;
+        }
+    }
+
+    fclose(src);
+    fclose(dst);
+    return 0;
+}

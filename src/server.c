@@ -118,9 +118,28 @@ int main(void) {
                 // process
                 if (content_type == TYPE_PUSH_FILE) {
                     send_content(connected_socket, "[ACCEPT]", TYPE_PUSH_FILE);
-                    recv_file(connected_socket, buffer);
+                    if (create_snapshot(buffer) < 0) {
+                        send_error(connected_socket, "Snapshot failed");
+                    }
+                    long long expected_size = -1;
+                    if (!recv_meta_size(connected_socket, &expected_size)) {
+                        send_error(connected_socket, "Meta size missing");
+                        free(buffer);
+                        break;
+                    }
+                    long long received_size = recv_file(connected_socket, buffer);
+                    if (expected_size >= 0 && received_size >= 0 && received_size != expected_size) {
+                        send_error(connected_socket, "Size mismatch");
+                    }
                 } else if (content_type == TYPE_PULL_FILE) {
                     send_content(connected_socket, "[ACCEPT]", TYPE_PULL_FILE);
+                    long long file_size = get_file_size(buffer);
+                    if (file_size < 0) {
+                        send_error(connected_socket, "No such file");
+                        free(buffer);
+                        break;
+                    }
+                    send_meta_size(connected_socket, file_size);
                     send_file(connected_socket, buffer);
                 } else if (content_type == TYPE_MESSAGE) {
                     send_content(connected_socket, "Content type: MESSAGE", TYPE_MESSAGE);
