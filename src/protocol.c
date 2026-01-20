@@ -106,14 +106,18 @@ int send_file_list(int socket) {
     char *base_dir = "./";
     struct file_entry entries[MAX_DATA];
     char msg[MAX_LINE_LEN+1];
+    char size_buf[64];
+    char mtime_buf[64];
 
     int num_files = get_file_list(base_dir, entries);
 
     if (num_files > 0) {
         for (int i=0;i<num_files;i++) {
-            send_content(socket, entries[i]->name, TYPE_FILE_LIST);
-            send_content(socket, entries[i]->size, TYPE_FILE_LIST);
-            send_content(socket, entries[i]->mtime, TYPE_FILE_LIST);
+            send_content(socket, entries[i].name, TYPE_FILE_LIST);
+            snprintf(size_buf, sizeof(size_buf), "%d", entries[i].size);
+            snprintf(mtime_buf, sizeof(mtime_buf), "%d", entries[i].mtime);
+            send_content(socket, size_buf, TYPE_FILE_LIST);
+            send_content(socket, mtime_buf, TYPE_FILE_LIST);
         }
         strncpy(msg, "Complete send data", 19);
     } else {

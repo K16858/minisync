@@ -1,6 +1,8 @@
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
+#include "utils.h"
+
 typedef enum {
     TYPE_HELLO,
     TYPE_HELLO_ACK,

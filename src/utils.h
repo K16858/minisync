@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdio.h>
+
 #define MAX_LINE_LEN 1024
 
 struct file_entry {
