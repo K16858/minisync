@@ -14,48 +14,65 @@
 #define MAX_DATA 500
 struct addrinfo hints, *res;
 
+static void print_usage(const char *prog) {
+    printf("Usage:\n");
+    printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
+    printf("  %s pull <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
+    printf("  %s -v | --version\n", prog);
+    printf("  %s -h | --help\n", prog);
+}
+
 int main(int argc, char *argv[]) {
     memset(&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM; /* TCP */
     hints.ai_family = AF_INET; /* IPv4 */
 
-    char arg_buf[MAX_LINE_LEN];
-    char *arg = arg_buf;
-    char file_path_buf[MAX_LINE_LEN];
-    char *file_path = file_path_buf;
-    char hostname_buf[MAX_LINE_LEN];
-    char port_buf[MAX_LINE_LEN];
-    char *hostname = hostname_buf;
-    char *port = port_buf;
+    char *arg = NULL;
+    char *file_path = NULL;
+    char *hostname = "localhost";
+    char *port = "61001";
+    char *token = NULL;
+    int yes = 0;
 
-    if(argc > 1) {
-        arg = argv[1];
-    } else {
-        arg = "-v";
+    if (argc < 2) {
+        print_usage(argv[0]);
+        return 1;
     }
 
-    if (argc > 2) {
-        file_path = argv[2];
-    } else {
-        file_path = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strncmp(argv[i], "-v", 3) == 0 || strcmp(argv[i], "--version") == 0) {
+            arg = "-v";
+        } else if (strncmp(argv[i], "-h", 3) == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
+            hostname = argv[++i];
+        } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+            port = argv[++i];
+        } else if (strcmp(argv[i], "--token") == 0 && i + 1 < argc) {
+            token = argv[++i];
+        } else if (strcmp(argv[i], "--yes") == 0) {
+            yes = 1;
+        } else if (strcmp(argv[i], "push") == 0 || strcmp(argv[i], "pull") == 0) {
+            arg = argv[i];
+            if (i + 1 < argc) {
+                file_path = argv[++i];
+            }
+        }
     }
 
-    // if(argc > 1) {
-    //     hostname = argv[1];
-    // } else {
-    //     hostname = "localhost";
-    // }
-
-    // if(argc > 2) {
-    //     port = argv[2];
-    // } else {
-    //     port = "61001";
-    // }
-
-    hostname = "localhost";
-    port = "61001";
+    if (arg == NULL) {
+        print_usage(argv[0]);
+        return 1;
+    }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
+    if (token != NULL) {
+        printf("Token: [set]\n");
+    }
+    if (yes) {
+        printf("Confirm: disabled\n");
+    }
 
     int gai_err = getaddrinfo(hostname, port, &hints, &res);
     if (gai_err) {
