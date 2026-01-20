@@ -20,7 +20,7 @@ static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
     printf("  %s pull <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
-    printf("  %s init\n", prog);
+    printf("  %s init [--name NAME]\n", prog);
     printf("  %s discover\n", prog);
     printf("  %s connect\n", prog);
     printf("  %s -v | --version\n", prog);
@@ -63,7 +63,7 @@ static int generate_random_hex(char *out, size_t bytes_len) {
     return 0;
 }
 
-static int init_space() {
+static int init_space(const char *init_name) {
     const char *dir = ".msync";
     struct stat st;
 
@@ -85,10 +85,12 @@ static int init_space() {
     }
 
     char name[64] = "msync-space";
-    char hostname[64];
+    char hostname[64] = "";
+    if (init_name != NULL && init_name[0] != '\0') {
+        snprintf(name, sizeof(name), "%s", init_name);
+    }
     if (gethostname(hostname, sizeof(hostname)) == 0) {
         hostname[sizeof(hostname) - 1] = '\0';
-        snprintf(name, sizeof(name), "%s", hostname);
     }
 
     char config_path[PATH_MAX];
@@ -102,10 +104,11 @@ static int init_space() {
             "{\n"
             "  \"id\": \"%s\",\n"
             "  \"name\": \"%s\",\n"
+            "  \"hostname\": \"%s\",\n"
             "  \"token\": \"%s\",\n"
             "  \"port\": %d\n"
             "}\n",
-            id, name, token, 61001);
+            id, name, hostname, token, 61001);
     fclose(cfg);
 
     char targets_path[PATH_MAX];
@@ -132,6 +135,7 @@ int main(int argc, char *argv[]) {
     char *hostname = "localhost";
     char *port = "61001";
     char *token = NULL;
+    char *init_name = NULL;
     int yes = 0;
 
     if (argc < 2) {
@@ -145,6 +149,8 @@ int main(int argc, char *argv[]) {
         } else if (strncmp(argv[i], "-h", 3) == 0 || strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
+        } else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
+            init_name = argv[++i];
         } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
             hostname = argv[++i];
         } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -159,7 +165,7 @@ int main(int argc, char *argv[]) {
                 file_path = argv[++i];
             }
         } else if (strcmp(argv[i], "init") == 0) {
-            return init_space();
+            arg = "init";
         } else {
             print_usage(argv[0]);
             return 1;
@@ -169,6 +175,10 @@ int main(int argc, char *argv[]) {
     if (arg == NULL) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (strncmp(arg, "init", 5) == 0) {
+        return init_space(init_name);
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
