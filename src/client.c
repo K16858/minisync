@@ -18,6 +18,9 @@ static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
     printf("  %s pull <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
+    printf("  %s init\n", prog);
+    printf("  %s discover\n", prog);
+    printf("  %s connect\n", prog);
     printf("  %s -v | --version\n", prog);
     printf("  %s -h | --help\n", prog);
 }
