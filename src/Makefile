@@ -14,5 +14,6 @@ clean-test:
 
 clean: clean-test
 	@rm -f client server manager
+	@rm -r .msync
 
 .PHONY: test clean-test clean

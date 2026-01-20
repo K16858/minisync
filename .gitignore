@@ -7,3 +7,4 @@ day*/
 src/client
 src/server
 .vscode
+.msync
