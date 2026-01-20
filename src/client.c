@@ -20,7 +20,8 @@ static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
     printf("  %s pull <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
-    printf("  %s init [--name NAME]\n", prog);
+    printf("  %s init <name>\n", prog);
+    printf("  %s init --name NAME\n", prog);
     printf("  %s discover\n", prog);
     printf("  %s connect\n", prog);
     printf("  %s -v | --version\n", prog);
@@ -166,6 +167,9 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "init") == 0) {
             arg = "init";
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                init_name = argv[++i];
+            }
         } else {
             print_usage(argv[0]);
             return 1;
@@ -178,6 +182,16 @@ int main(int argc, char *argv[]) {
     }
 
     if (strncmp(arg, "init", 5) == 0) {
+        char input_name[64];
+        if (init_name == NULL || init_name[0] == '\0') {
+            printf("Enter space name: ");
+            get_line(input_name, stdin);
+            init_name = input_name;
+        }
+        if (init_name == NULL || init_name[0] == '\0') {
+            printf("Name is required\n");
+            return 1;
+        }
         return init_space(init_name);
     }
 
