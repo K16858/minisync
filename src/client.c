@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <arpa/inet.h>
+#include <time.h>
 #include "protocol.h"
 #include "utils.h"
 
@@ -28,6 +29,55 @@ struct discovered_space {
 static struct discovered_space discovered[MAX_DATA];
 static int discovered_count = 0;
 
+static int save_discover_cache() {
+    FILE *fp = fopen(".msync/discover.txt", "w");
+    if (fp == NULL) {
+        printf("Failed to write .msync/discover.txt\n");
+        return 1;
+    }
+    for (int i = 0; i < discovered_count; i++) {
+        fprintf(fp, "%s\t%s\t%s\t%s\t%d\n",
+                discovered[i].id,
+                discovered[i].name,
+                discovered[i].hostname,
+                discovered[i].ip,
+                discovered[i].port);
+    }
+    fclose(fp);
+    return 0;
+}
+
+static int load_discover_cache() {
+    FILE *fp = fopen(".msync/discover.txt", "r");
+    if (fp == NULL) {
+        return 1;
+    }
+    discovered_count = 0;
+    char line[MAX_LINE_LEN + 1];
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        char *id = strtok(line, "\t\n");
+        char *name = strtok(NULL, "\t\n");
+        char *hostname = strtok(NULL, "\t\n");
+        char *ip = strtok(NULL, "\t\n");
+        char *port = strtok(NULL, "\t\n");
+        if (id == NULL || name == NULL || hostname == NULL || ip == NULL || port == NULL) {
+            continue;
+        }
+        if (discovered_count >= MAX_DATA) {
+            break;
+        }
+        snprintf(discovered[discovered_count].id, sizeof(discovered[discovered_count].id), "%s", id);
+        snprintf(discovered[discovered_count].name, sizeof(discovered[discovered_count].name), "%s", name);
+        snprintf(discovered[discovered_count].hostname, sizeof(discovered[discovered_count].hostname), "%s", hostname);
+        snprintf(discovered[discovered_count].ip, sizeof(discovered[discovered_count].ip), "%s", ip);
+        discovered[discovered_count].port = atoi(port);
+        discovered_count++;
+    }
+    fclose(fp);
+    return 0;
+}
+
+
 static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
@@ -35,7 +85,7 @@ static void print_usage(const char *prog) {
     printf("  %s init <name>\n", prog);
     printf("  %s init --name NAME\n", prog);
     printf("  %s discover\n", prog);
-    printf("  %s connect\n", prog);
+    printf("  %s connect <id|index>\n", prog);
     printf("  %s -v | --version\n", prog);
     printf("  %s -h | --help\n", prog);
 }
@@ -201,7 +251,61 @@ static int discover_spaces() {
         printf("No spaces found\n");
     }
 
+    save_discover_cache();
+
     close(s);
+    return 0;
+}
+
+static int connect_space(const char *selector) {
+    if (selector == NULL || selector[0] == '\0') {
+        printf("connect requires id or index\n");
+        return 1;
+    }
+
+    if (discovered_count == 0) {
+        load_discover_cache();
+    }
+    if (discovered_count == 0) {
+        printf("No discover cache. Run discover first.\n");
+        return 1;
+    }
+
+    const struct discovered_space *target = NULL;
+    int is_number = 1;
+    for (size_t i = 0; selector[i] != '\0'; i++) {
+        if (selector[i] < '0' || selector[i] > '9') {
+            is_number = 0;
+            break;
+        }
+    }
+
+    if (is_number) {
+        int index = atoi(selector);
+        if (index >= 0 && index < discovered_count) {
+            target = &discovered[index];
+        }
+    } else {
+        for (int i = 0; i < discovered_count; i++) {
+            if (strcmp(discovered[i].id, selector) == 0) {
+                target = &discovered[i];
+                break;
+            }
+        }
+    }
+
+    if (target == NULL) {
+        printf("Target not found: %s\n", selector);
+        return 1;
+    }
+
+    time_t now = time(NULL);
+    if (append_target_json(".msync/targets.json", target->id, target->name, target->ip, target->port, (long)now) != 0) {
+        printf("Failed to save target\n");
+        return 1;
+    }
+
+    printf("Connected to %s (%s:%d)\n", target->name, target->ip, target->port);
     return 0;
 }
 
@@ -216,6 +320,7 @@ int main(int argc, char *argv[]) {
     char *port = "61001";
     char *token = NULL;
     char *init_name = NULL;
+    char *connect_target = NULL;
     int yes = 0;
 
     if (argc < 2) {
@@ -251,6 +356,11 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "discover") == 0) {
             arg = "discover";
+        } else if (strcmp(argv[i], "connect") == 0) {
+            arg = "connect";
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                connect_target = argv[++i];
+            }
         } else {
             print_usage(argv[0]);
             return 1;
@@ -278,6 +388,10 @@ int main(int argc, char *argv[]) {
 
     if (strncmp(arg, "discover", 9) == 0) {
         return discover_spaces();
+    }
+
+    if (strncmp(arg, "connect", 8) == 0) {
+        return connect_space(connect_target);
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
