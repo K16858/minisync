@@ -316,8 +316,8 @@ int main(int argc, char *argv[]) {
 
     char *arg = NULL;
     char *file_path = NULL;
-    char *hostname = "localhost";
-    char *port = "61001";
+    char *hostname = NULL;
+    char *port = NULL;
     char *token = NULL;
     char *init_name = NULL;
     char *connect_target = NULL;
@@ -392,6 +392,22 @@ int main(int argc, char *argv[]) {
 
     if (strncmp(arg, "connect", 8) == 0) {
         return connect_space(connect_target);
+    }
+
+    if ((strncmp(arg, "push", 5) == 0 || strncmp(arg, "pull", 5) == 0) && (hostname == NULL || port == NULL)) {
+        char last_host[64];
+        int last_port = 0;
+        if (load_last_target(".msync/targets.json", last_host, sizeof(last_host), &last_port) == 0) {
+            hostname = strdup(last_host);
+            static char port_buf[16];
+            snprintf(port_buf, sizeof(port_buf), "%d", last_port);
+            port = port_buf;
+        }
+    }
+
+    if (hostname == NULL || port == NULL) {
+        printf("Host/port not set. Use --host/--port or connect first.\n");
+        return 1;
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
