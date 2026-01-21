@@ -169,6 +169,7 @@ static int discover_spaces() {
         char id[64], name[64], hostname[64];
         int port = 0;
         if (sscanf(buf, "MSYNC_HERE %63s %63s %63s %d", id, name, hostname, &port) != 4) {
+            printf("Discover parse failed: %s\n", buf);
             continue;
         }
 

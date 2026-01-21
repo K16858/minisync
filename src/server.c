@@ -49,6 +49,7 @@ static int start_discover_server() {
 
     int s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s < 0) {
+        perror("discover socket");
         return -1;
     }
 
@@ -60,6 +61,7 @@ static int start_discover_server() {
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(s, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+        perror("discover bind");
         close(s);
         return -1;
     }
@@ -70,9 +72,27 @@ static int start_discover_server() {
 
 int main(void) {
     struct msync_config config;
+    memset(&config, 0, sizeof(config));
     int port = 61001;
     if (load_config(".msync/config.json", &config) == 0) {
         port = config.port;
+    } else {
+        printf("Warning: .msync/config.json not found, using defaults\n");
+    }
+    if (config.id[0] == '\0') {
+        snprintf(config.id, sizeof(config.id), "unknown-id");
+    }
+    if (config.name[0] == '\0') {
+        snprintf(config.name, sizeof(config.name), "unknown-name");
+    }
+    if (config.hostname[0] == '\0') {
+        char hostbuf[64];
+        if (gethostname(hostbuf, sizeof(hostbuf)) == 0) {
+            hostbuf[sizeof(hostbuf) - 1] = '\0';
+            snprintf(config.hostname, sizeof(config.hostname), "%s", hostbuf);
+        } else {
+            snprintf(config.hostname, sizeof(config.hostname), "unknown-host");
+        }
     }
 
     int socket = start_server(port);
@@ -92,6 +112,8 @@ int main(void) {
                 }
                 buf[n] = '\0';
 
+                printf("Discover recv: %s\n", buf);
+
                 if (strncmp(buf, "MSYNC_DISCOVER", 14) != 0) {
                     continue;
                 }
@@ -99,8 +121,10 @@ int main(void) {
                 char reply[MAX_LINE_LEN + 1];
                 snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
                          config.id, config.name, config.hostname, port);
-                sendto(discover_socket, reply, strlen(reply), 0,
-                       (struct sockaddr*)&client_addr, addrlen);
+                  if (sendto(discover_socket, reply, strlen(reply), 0,
+                          (struct sockaddr*)&client_addr, addrlen) < 0) {
+                      perror("discover sendto");
+                  }
             }
             close(discover_socket);
             exit(0);
