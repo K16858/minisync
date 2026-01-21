@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <arpa/inet.h>
 #include "protocol.h"
 #include "utils.h"
 
@@ -126,6 +127,62 @@ static int init_space(const char *init_name) {
     return 0;
 }
 
+static int discover_spaces() {
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) {
+        printf("Discover socket error\n");
+        return 1;
+    }
+
+    int yes = 1;
+    setsockopt(s, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
+
+    struct timeval tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 0;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(61002);
+    addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    const char *msg = "MSYNC_DISCOVER";
+    sendto(s, msg, strlen(msg), 0, (struct sockaddr*)&addr, sizeof(addr));
+
+    printf("#  ID                               NAME            HOSTNAME        IP              PORT\n");
+    int index = 0;
+    while (1) {
+        char buf[MAX_LINE_LEN + 1];
+        struct sockaddr_in from;
+        socklen_t fromlen = sizeof(from);
+        int n = recvfrom(s, buf, MAX_LINE_LEN, 0, (struct sockaddr*)&from, &fromlen);
+        if (n <= 0) {
+            break;
+        }
+        buf[n] = '\0';
+
+        char id[64], name[64], hostname[64];
+        int port = 0;
+        if (sscanf(buf, "MSYNC_HERE %63s %63s %63s %d", id, name, hostname, &port) != 4) {
+            continue;
+        }
+
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &from.sin_addr, ip, sizeof(ip));
+        printf("%d  %-31s %-15s %-15s %-15s %d\n", index, id, name, hostname, ip, port);
+        index++;
+    }
+
+    if (index == 0) {
+        printf("No spaces found\n");
+    }
+
+    close(s);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     memset(&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM; /* TCP */
@@ -170,6 +227,8 @@ int main(int argc, char *argv[]) {
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 init_name = argv[++i];
             }
+        } else if (strcmp(argv[i], "discover") == 0) {
+            arg = "discover";
         } else {
             print_usage(argv[0]);
             return 1;
@@ -193,6 +252,10 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         return init_space(init_name);
+    }
+
+    if (strncmp(arg, "discover", 9) == 0) {
+        return discover_spaces();
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
