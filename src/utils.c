@@ -81,6 +81,98 @@ int get_file_list(char *base_dir, struct file_entry entries[]) {
     return file_count;
 }
 
+static int extract_json_string(const char *json, const char *key, char *out, size_t out_len) {
+    const char *p = strstr(json, key);
+    if (p == NULL) {
+        return 0;
+    }
+    p = strchr(p, ':');
+    if (p == NULL) {
+        return 0;
+    }
+    p = strchr(p, '"');
+    if (p == NULL) {
+        return 0;
+    }
+    p++;
+    const char *end = strchr(p, '"');
+    if (end == NULL) {
+        return 0;
+    }
+    size_t len = (size_t)(end - p);
+    if (len + 1 > out_len) {
+        return 0;
+    }
+    memcpy(out, p, len);
+    out[len] = '\0';
+    return 1;
+}
+
+static int extract_json_int(const char *json, const char *key, int *out) {
+    const char *p = strstr(json, key);
+    if (p == NULL) {
+        return 0;
+    }
+    p = strchr(p, ':');
+    if (p == NULL) {
+        return 0;
+    }
+    p++;
+    while (*p == ' ' || *p == '\t') {
+        p++;
+    }
+    *out = atoi(p);
+    return 1;
+}
+
+int load_config(const char *path, struct msync_config *cfg) {
+    if (cfg == NULL) {
+        return -1;
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (size <= 0 || size > 65536) {
+        fclose(fp);
+        return -1;
+    }
+
+    char *json = malloc((size_t)size + 1);
+    if (json == NULL) {
+        fclose(fp);
+        return -1;
+    }
+
+    if (fread(json, 1, (size_t)size, fp) != (size_t)size) {
+        free(json);
+        fclose(fp);
+        return -1;
+    }
+    json[size] = '\0';
+    fclose(fp);
+
+    if (!extract_json_string(json, "\"id\"", cfg->id, sizeof(cfg->id)) ||
+        !extract_json_string(json, "\"name\"", cfg->name, sizeof(cfg->name)) ||
+        !extract_json_string(json, "\"hostname\"", cfg->hostname, sizeof(cfg->hostname)) ||
+        !extract_json_string(json, "\"token\"", cfg->token, sizeof(cfg->token))) {
+        free(json);
+        return -1;
+    }
+
+    if (!extract_json_int(json, "\"port\"", &cfg->port)) {
+        cfg->port = 61001;
+    }
+
+    free(json);
+    return 0;
+}
+
 long long get_file_size(const char *path) {
     struct stat st;
     if (stat(path, &st) < 0) {
