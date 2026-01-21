@@ -13,7 +13,7 @@
 #define MAX_LINE_LEN 1024
 struct addrinfo hints, *res;
 
-int start_server() {
+int start_server(int port) {
     struct sockaddr_in sa;
     memset((char *)&sa, 0, sizeof(sa));
 
@@ -23,13 +23,13 @@ int start_server() {
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
     sa.sin_family = AF_INET; // IPv4
-    sa.sin_port = htons(61001); // 待ち受けポート番号
+    sa.sin_port = htons(port); // 待ち受けポート番号
     sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
     bind(s, (struct sockaddr*)&sa, sizeof(sa));
 
     listen(s, 1);
-    printf("Start...\n");
+    printf("Start... port=%d\n", port);
 
     return s;
 }
@@ -43,7 +43,13 @@ int recv_connection(int socket) {
 }
 
 int main(void) {
-    int socket = start_server();
+    struct msync_config config;
+    int port = 61001;
+    if (load_config(".msync/config.json", &config) == 0) {
+        port = config.port;
+    }
+
+    int socket = start_server(port);
 
     while (1) {
         char line[MAX_LINE_LEN + 1];
