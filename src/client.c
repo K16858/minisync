@@ -17,6 +17,17 @@
 #define MAX_DATA 500
 struct addrinfo hints, *res;
 
+struct discovered_space {
+    char id[64];
+    char name[64];
+    char hostname[64];
+    char ip[64];
+    int port;
+};
+
+static struct discovered_space discovered[MAX_DATA];
+static int discovered_count = 0;
+
 static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s push <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
@@ -154,8 +165,8 @@ static int discover_spaces() {
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     sendto(s, msg, strlen(msg), 0, (struct sockaddr*)&addr, sizeof(addr));
 
+    discovered_count = 0;
     printf("#  ID                               NAME            HOSTNAME        IP              PORT\n");
-    int index = 0;
     while (1) {
         char buf[MAX_LINE_LEN + 1];
         struct sockaddr_in from;
@@ -175,11 +186,18 @@ static int discover_spaces() {
 
         char ip[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &from.sin_addr, ip, sizeof(ip));
-        printf("%d  %-31s %-15s %-15s %-15s %d\n", index, id, name, hostname, ip, port);
-        index++;
+        if (discovered_count < MAX_DATA) {
+            snprintf(discovered[discovered_count].id, sizeof(discovered[discovered_count].id), "%s", id);
+            snprintf(discovered[discovered_count].name, sizeof(discovered[discovered_count].name), "%s", name);
+            snprintf(discovered[discovered_count].hostname, sizeof(discovered[discovered_count].hostname), "%s", hostname);
+            snprintf(discovered[discovered_count].ip, sizeof(discovered[discovered_count].ip), "%s", ip);
+            discovered[discovered_count].port = port;
+            printf("%d  %-31s %-15s %-15s %-15s %d\n", discovered_count, id, name, hostname, ip, port);
+            discovered_count++;
+        }
     }
 
-    if (index == 0) {
+    if (discovered_count == 0) {
         printf("No spaces found\n");
     }
 
