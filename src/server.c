@@ -11,6 +11,7 @@
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
+#define DISCOVER_PORT 61002
 struct addrinfo hints, *res;
 
 int start_server(int port) {
@@ -42,6 +43,31 @@ int recv_connection(int socket) {
     return connect_s;
 }
 
+static int start_discover_server() {
+    struct sockaddr_in sa;
+    memset((char *)&sa, 0, sizeof(sa));
+
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) {
+        return -1;
+    }
+
+    int yes = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(DISCOVER_PORT);
+    sa.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(s, (struct sockaddr*)&sa, sizeof(sa)) < 0) {
+        close(s);
+        return -1;
+    }
+
+    printf("Discover listener on UDP %d\n", DISCOVER_PORT);
+    return s;
+}
+
 int main(void) {
     struct msync_config config;
     int port = 61001;
@@ -50,6 +76,36 @@ int main(void) {
     }
 
     int socket = start_server(port);
+
+    int discover_socket = start_discover_server();
+    if (discover_socket >= 0) {
+        int dpid = fork();
+        if (dpid == 0) {
+            // Discover responder
+            while (1) {
+                struct sockaddr_in client_addr;
+                socklen_t addrlen = sizeof(client_addr);
+                char buf[MAX_LINE_LEN + 1];
+                int n = recvfrom(discover_socket, buf, MAX_LINE_LEN, 0, (struct sockaddr*)&client_addr, &addrlen);
+                if (n <= 0) {
+                    continue;
+                }
+                buf[n] = '\0';
+
+                if (strncmp(buf, "MSYNC_DISCOVER", 14) != 0) {
+                    continue;
+                }
+
+                char reply[MAX_LINE_LEN + 1];
+                snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
+                         config.id, config.name, config.hostname, port);
+                sendto(discover_socket, reply, strlen(reply), 0,
+                       (struct sockaddr*)&client_addr, addrlen);
+            }
+            close(discover_socket);
+            exit(0);
+        }
+    }
 
     while (1) {
         char line[MAX_LINE_LEN + 1];
