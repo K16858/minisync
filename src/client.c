@@ -146,9 +146,12 @@ static int discover_spaces() {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_port = htons(61002);
-    addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
     const char *msg = "MSYNC_DISCOVER";
+    addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+    sendto(s, msg, strlen(msg), 0, (struct sockaddr*)&addr, sizeof(addr));
+
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     sendto(s, msg, strlen(msg), 0, (struct sockaddr*)&addr, sizeof(addr));
 
     printf("#  ID                               NAME            HOSTNAME        IP              PORT\n");
