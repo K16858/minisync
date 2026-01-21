@@ -214,3 +214,80 @@ int create_snapshot(const char *path) {
     fclose(dst);
     return 0;
 }
+
+static void json_escape(const char *in, char *out, size_t out_len) {
+    size_t j = 0;
+    for (size_t i = 0; in[i] != '\0' && j + 2 < out_len; i++) {
+        if (in[i] == '"' || in[i] == '\\') {
+            out[j++] = '\\';
+        }
+        out[j++] = in[i];
+    }
+    out[j] = '\0';
+}
+
+int append_target_json(const char *path, const char *id, const char *name, const char *host, int port, long last_connected_at) {
+    FILE *fp = fopen(path, "r");
+    char *buf = NULL;
+    long size = 0;
+
+    if (fp != NULL) {
+        fseek(fp, 0, SEEK_END);
+        size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        if (size < 0 || size > 65536) {
+            fclose(fp);
+            return 1;
+        }
+        buf = malloc((size_t)size + 1);
+        if (buf == NULL) {
+            fclose(fp);
+            return 1;
+        }
+        if (fread(buf, 1, (size_t)size, fp) != (size_t)size) {
+            free(buf);
+            fclose(fp);
+            return 1;
+        }
+        buf[size] = '\0';
+        fclose(fp);
+    }
+
+    char id_esc[128], name_esc[128], host_esc[128];
+    json_escape(id, id_esc, sizeof(id_esc));
+    json_escape(name, name_esc, sizeof(name_esc));
+    json_escape(host, host_esc, sizeof(host_esc));
+
+    char entry[MAX_LINE_LEN + 1];
+    snprintf(entry, sizeof(entry),
+             "{\"id\":\"%s\",\"name\":\"%s\",\"host\":\"%s\",\"port\":%d,\"last_connected_at\":%ld}",
+             id_esc, name_esc, host_esc, port, last_connected_at);
+
+    FILE *out = fopen(path, "w");
+    if (out == NULL) {
+        free(buf);
+        return 1;
+    }
+
+    if (buf == NULL || size == 0) {
+        fprintf(out, "[%s]\n", entry);
+    } else {
+        while (size > 0 && (buf[size - 1] == '\n' || buf[size - 1] == '\r' || buf[size - 1] == ' ')) {
+            buf[size - 1] = '\0';
+            size--;
+        }
+        if (strcmp(buf, "[]") == 0) {
+            fprintf(out, "[%s]\n", entry);
+        } else {
+            char *end = strrchr(buf, ']');
+            if (end != NULL) {
+                *end = '\0';
+            }
+            fprintf(out, "%s,%s]\n", buf, entry);
+        }
+    }
+
+    free(buf);
+    fclose(out);
+    return 0;
+}
