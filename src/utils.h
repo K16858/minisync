@@ -26,5 +26,6 @@ long long get_file_size(const char *path);
 int create_snapshot(const char *path);
 int load_config(const char *path, struct msync_config *cfg);
 int append_target_json(const char *path, const char *id, const char *name, const char *host, int port, long last_connected_at);
+int load_last_target(const char *path, char *host, size_t host_len, int *port);
 
 #endif

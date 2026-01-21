@@ -291,3 +291,76 @@ int append_target_json(const char *path, const char *id, const char *name, const
     fclose(out);
     return 0;
 }
+
+int load_last_target(const char *path, char *host, size_t host_len, int *port) {
+    if (host == NULL || port == NULL) {
+        return 1;
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        return 1;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (size <= 0 || size > 65536) {
+        fclose(fp);
+        return 1;
+    }
+
+    char *json = malloc((size_t)size + 1);
+    if (json == NULL) {
+        fclose(fp);
+        return 1;
+    }
+
+    if (fread(json, 1, (size_t)size, fp) != (size_t)size) {
+        free(json);
+        fclose(fp);
+        return 1;
+    }
+    json[size] = '\0';
+    fclose(fp);
+
+    char *last_host = NULL;
+    int last_port = -1;
+    char *p = json;
+    while ((p = strstr(p, "\"host\"")) != NULL) {
+        char *colon = strchr(p, ':');
+        if (colon == NULL) {
+            break;
+        }
+        char *q = strchr(colon, '"');
+        if (q == NULL) {
+            break;
+        }
+        q++;
+        char *end = strchr(q, '"');
+        if (end == NULL) {
+            break;
+        }
+        *end = '\0';
+        last_host = q;
+
+        char *port_key = strstr(end + 1, "\"port\"");
+        if (port_key != NULL) {
+            char *pcolon = strchr(port_key, ':');
+            if (pcolon != NULL) {
+                last_port = atoi(pcolon + 1);
+            }
+        }
+        p = end + 1;
+    }
+
+    if (last_host == NULL || last_port <= 0) {
+        free(json);
+        return 1;
+    }
+
+    snprintf(host, host_len, "%s", last_host);
+    *port = last_port;
+    free(json);
+    return 0;
+}
