@@ -14,7 +14,7 @@ clean-test:
 
 clean: clean-test
 	@rm -f client server manager
-	@rm -r .msync
+	@rm -rf .msync
 
 install:
 	@echo "Installing minisync..."
