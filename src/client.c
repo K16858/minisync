@@ -508,12 +508,19 @@ int main(int argc, char *argv[]) {
             freeaddrinfo(res);
             return 1;
         }
+        char resolved_path[PATH_MAX];
+        if (validate_file_path(file_path, ".", resolved_path, sizeof(resolved_path)) != 0) {
+            printf("Invalid or unsafe file path: %s\n", file_path);
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PULL_FILE)) {
             long long expected_size = -1;
             if (!recv_meta_size(connected_socket, &expected_size)) {
                 printf("Meta size missing\n");
             } else {
-                long long received_size = recv_file(connected_socket, file_path);
+                long long received_size = recv_file(connected_socket, resolved_path);
                 if (received_size >= 0 && expected_size >= 0 && received_size != expected_size) {
                     printf("Size mismatch: expected %lld received %lld\n", expected_size, received_size);
                 }
@@ -526,9 +533,16 @@ int main(int argc, char *argv[]) {
             freeaddrinfo(res);
             return 1;
         }
+        char resolved_path[PATH_MAX];
+        if (validate_file_path(file_path, ".", resolved_path, sizeof(resolved_path)) != 0) {
+            printf("Invalid or unsafe file path: %s\n", file_path);
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PUSH_FILE)) {
             printf("push file: %s\n", file_path);
-            long long size = get_file_size(file_path);
+            long long size = get_file_size(resolved_path);
             if (size < 0) {
                 printf("No such file: %s\n", file_path);
                 close(connected_socket);
@@ -536,7 +550,7 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             send_meta_size(connected_socket, size);
-            send_file(connected_socket, file_path);
+            send_file(connected_socket, resolved_path);
         }
     } else {
         printf("Unknown argument\n");
