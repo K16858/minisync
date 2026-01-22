@@ -93,25 +93,10 @@ int main(void) {
     }
 
     struct space_entry *space = &gcfg.spaces[0];
-    printf("Starting server for space: %s\n", space->name);
-    printf("  Path: %s\n", space->path);
-    printf("  Port: %d\n\n", space->port);
+    printf("Starting server (multi-space support)\n");
+    printf("Listening on port: 61001\n\n");
 
-    if (chdir(space->path) < 0) {
-        printf("Failed to chdir to %s\n", space->path);
-        free_global_config(&gcfg);
-        return 1;
-    }
-
-    struct msync_config config;
-    memset(&config, 0, sizeof(config));
-    if (load_config(".msync/config.json", &config) != 0) {
-        printf("Failed to load %s/.msync/config.json\n", space->path);
-        free_global_config(&gcfg);
-        return 1;
-    }
-
-    int socket = start_server(space->port);
+    int socket = start_server(61001);
 
     int discover_socket = start_discover_server();
     if (discover_socket >= 0) {
@@ -134,9 +119,15 @@ int main(void) {
                     continue;
                 }
 
+                // TODO
+                struct space_entry *first_space = &gcfg.spaces[0];
+                char hostname[64] = "localhost";
+                gethostname(hostname, sizeof(hostname));
+                hostname[sizeof(hostname) - 1] = '\0';
+                
                 char reply[MAX_LINE_LEN + 1];
                 snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
-                         config.id, config.name, config.hostname, space->port);
+                         first_space->id, first_space->name, hostname, 61001);
                   if (sendto(discover_socket, reply, strlen(reply), 0,
                           (struct sockaddr*)&client_addr, addrlen) < 0) {
                       perror("discover sendto");
@@ -161,6 +152,7 @@ int main(void) {
         } else if (pid == 0) {
             // Child process
             close(socket);
+            
             int hello_len;
             Content hello_type;
             if (recv(connected_socket, &hello_type, sizeof(hello_type), MSG_WAITALL) <= 0) {
@@ -171,16 +163,46 @@ int main(void) {
                 close(connected_socket);
                 exit(0);
             }
-            if (hello_len > 0) {
-                char *hello_buf = malloc(hello_len + 1);
-                recv(connected_socket, hello_buf, hello_len, MSG_WAITALL);
-                hello_buf[hello_len] = '\0';
-                free(hello_buf);
+            char space_id[128];
+            if (hello_len > 0 && hello_len < sizeof(space_id)) {
+                recv(connected_socket, space_id, hello_len, MSG_WAITALL);
+                space_id[hello_len] = '\0';
+            } else {
+                close(connected_socket);
+                exit(0);
             }
             if (hello_type != TYPE_HELLO) {
                 close(connected_socket);
                 exit(0);
             }
+            
+            struct space_entry *target_space = NULL;
+            for (int i = 0; i < gcfg.space_count; i++) {
+                if (strcmp(gcfg.spaces[i].id, space_id) == 0) {
+                    target_space = &gcfg.spaces[i];
+                    break;
+                }
+            }
+            if (target_space == NULL) {
+                send_error(connected_socket, "Unknown space ID");
+                close(connected_socket);
+                exit(0);
+            }
+            
+            if (chdir(target_space->path) < 0) {
+                send_error(connected_socket, "Failed to access space");
+                close(connected_socket);
+                exit(0);
+            }
+            
+            struct msync_config config;
+            memset(&config, 0, sizeof(config));
+            if (load_config(".msync/config.json", &config) != 0) {
+                send_error(connected_socket, "Failed to load space config");
+                close(connected_socket);
+                exit(0);
+            }
+            
             send_content(connected_socket, "HELLO_ACK", TYPE_HELLO_ACK);
             char token_buf[128];
             if (!recv_token(connected_socket, token_buf, sizeof(token_buf))) {
