@@ -424,11 +424,15 @@ int main(int argc, char *argv[]) {
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
+    
+    struct msync_config cfg;
+    if (load_config(".msync/config.json", &cfg) != 0) {
+        printf("Failed to load .msync/config.json\n");
+        return 1;
+    }
+    
     if (token == NULL) {
-        struct msync_config cfg;
-        if (load_config(".msync/config.json", &cfg) == 0) {
-            token = strdup(cfg.token);
-        }
+        token = strdup(cfg.token);
     }
     if (token != NULL) {
         printf("Token: [set]\n");
@@ -461,7 +465,8 @@ int main(int argc, char *argv[]) {
         printf("Connected\n");
     }
 
-    if (send_hello(connected_socket) < 0) {
+    // HELLOにspace IDを送信
+    if (send_content(connected_socket, cfg.id, TYPE_HELLO) < 0) {
         printf("Hello send error\n");
         close(connected_socket);
         freeaddrinfo(res);
