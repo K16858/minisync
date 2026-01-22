@@ -71,6 +71,27 @@ static int start_discover_server() {
 }
 
 int main(void) {
+    struct global_config gcfg;
+    if (load_global_config(&gcfg) < 0) {
+        printf("Failed to load global config\n");
+        return 1;
+    }
+
+    printf("=== Global Configuration ===\n");
+    printf("Registered spaces: %d\n", gcfg.space_count);
+    for (int i = 0; i < gcfg.space_count; i++) {
+        printf("  [%d] %s (%s) - %s:%d\n",
+               i, gcfg.spaces[i].name, gcfg.spaces[i].id,
+               gcfg.spaces[i].path, gcfg.spaces[i].port);
+    }
+    printf("\n");
+
+    if (gcfg.space_count == 0) {
+        printf("No spaces registered. Use 'msync init' first.\n");
+        free_global_config(&gcfg);
+        return 1;
+    }
+
     struct msync_config config;
     memset(&config, 0, sizeof(config));
     int port = 61001;
