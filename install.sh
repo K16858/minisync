@@ -18,7 +18,7 @@ fi
 
 echo "Detected: $OS-$ARCH"
 
-LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep "tag_name" | cut -d '"' -f 4)
+LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$REPO/releases" | grep "tag_name" | head -n 1 | cut -d '"' -f 4)
 
 if [ -z "$LATEST_RELEASE" ]; then
     echo "Failed to fetch latest release"
