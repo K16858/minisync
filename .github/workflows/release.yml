@@ -39,6 +39,7 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        prerelease: true
         files: |
           release/msync-linux-amd64
           release/msync-server-linux-amd64
