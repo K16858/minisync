@@ -8,3 +8,5 @@ src/client
 src/server
 .vscode
 .msync
+*test*
+test/
