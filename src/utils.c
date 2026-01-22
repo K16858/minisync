@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
+#include <errno.h>
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
@@ -363,4 +364,237 @@ int load_last_target(const char *path, char *host, size_t host_len, int *port) {
     *port = last_port;
     free(json);
     return 0;
+}
+
+static char* get_global_config_path(char *buf, size_t buf_len) {
+    const char *home = getenv("HOME");
+    if (home == NULL) {
+        return NULL;
+    }
+    snprintf(buf, buf_len, "%s/.config/minisync/config.json", home);
+    return buf;
+}
+
+static int ensure_config_dir(void) {
+    const char *home = getenv("HOME");
+    if (home == NULL) {
+        return -1;
+    }
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/.config", home);
+    mkdir(path, 0755);
+    snprintf(path, sizeof(path), "%s/.config/minisync", home);
+    if (mkdir(path, 0755) < 0 && errno != EEXIST) {
+        return -1;
+    }
+    return 0;
+}
+
+int load_global_config(struct global_config *gcfg) {
+    if (gcfg == NULL) {
+        return -1;
+    }
+    
+    gcfg->spaces = NULL;
+    gcfg->space_count = 0;
+    gcfg->space_capacity = 0;
+
+    char path[PATH_MAX];
+    if (get_global_config_path(path, sizeof(path)) == NULL) {
+        return -1;
+    }
+
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        return 0;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    if (size <= 0 || size > 1048576) {
+        fclose(fp);
+        return -1;
+    }
+
+    char *json = malloc((size_t)size + 1);
+    if (json == NULL) {
+        fclose(fp);
+        return -1;
+    }
+
+    if (fread(json, 1, (size_t)size, fp) != (size_t)size) {
+        free(json);
+        fclose(fp);
+        return -1;
+    }
+    json[size] = '\0';
+    fclose(fp);
+
+    char *spaces_start = strstr(json, "\"spaces\"");
+    if (spaces_start == NULL) {
+        free(json);
+        return 0;
+    }
+    
+    char *array_start = strchr(spaces_start, '[');
+    if (array_start == NULL) {
+        free(json);
+        return 0;
+    }
+
+    gcfg->space_capacity = 16;
+    gcfg->spaces = malloc(sizeof(struct space_entry) * (size_t)gcfg->space_capacity);
+    if (gcfg->spaces == NULL) {
+        free(json);
+        return -1;
+    }
+
+    char *p = array_start + 1;
+    while (*p != '\0' && *p != ']') {
+        while (*p == ' ' || *p == '\t' || *p == '\n' || *p == ',') {
+            p++;
+        }
+        if (*p != '{') {
+            break;
+        }
+
+        char *obj_start = p;
+        int brace_count = 0;
+        while (*p != '\0') {
+            if (*p == '{') brace_count++;
+            if (*p == '}') brace_count--;
+            if (brace_count == 0) break;
+            p++;
+        }
+        if (brace_count != 0) {
+            break;
+        }
+
+        char obj_buf[4096];
+        size_t obj_len = (size_t)(p - obj_start + 1);
+        if (obj_len >= sizeof(obj_buf)) {
+            continue;
+        }
+        memcpy(obj_buf, obj_start, obj_len);
+        obj_buf[obj_len] = '\0';
+
+        if (gcfg->space_count >= gcfg->space_capacity) {
+            gcfg->space_capacity *= 2;
+            struct space_entry *new_spaces = realloc(gcfg->spaces, 
+                sizeof(struct space_entry) * (size_t)gcfg->space_capacity);
+            if (new_spaces == NULL) {
+                break;
+            }
+            gcfg->spaces = new_spaces;
+        }
+
+        struct space_entry *entry = &gcfg->spaces[gcfg->space_count];
+        if (extract_json_string(obj_buf, "\"id\"", entry->id, sizeof(entry->id)) &&
+            extract_json_string(obj_buf, "\"name\"", entry->name, sizeof(entry->name)) &&
+            extract_json_string(obj_buf, "\"path\"", entry->path, sizeof(entry->path)) &&
+            extract_json_int(obj_buf, "\"port\"", &entry->port)) {
+            gcfg->space_count++;
+        }
+
+        p++;
+    }
+
+    free(json);
+    return 0;
+}
+
+int save_global_config(const struct global_config *gcfg) {
+    if (gcfg == NULL) {
+        return -1;
+    }
+
+    if (ensure_config_dir() < 0) {
+        return -1;
+    }
+
+    char path[PATH_MAX];
+    if (get_global_config_path(path, sizeof(path)) == NULL) {
+        return -1;
+    }
+
+    FILE *fp = fopen(path, "w");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    fprintf(fp, "{\n  \"spaces\": [\n");
+    for (int i = 0; i < gcfg->space_count; i++) {
+        const struct space_entry *e = &gcfg->spaces[i];
+        char id_esc[128], name_esc[128], path_esc[2048];
+        json_escape(e->id, id_esc, sizeof(id_esc));
+        json_escape(e->name, name_esc, sizeof(name_esc));
+        json_escape(e->path, path_esc, sizeof(path_esc));
+        
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"id\": \"%s\",\n", id_esc);
+        fprintf(fp, "      \"name\": \"%s\",\n", name_esc);
+        fprintf(fp, "      \"path\": \"%s\",\n", path_esc);
+        fprintf(fp, "      \"port\": %d\n", e->port);
+        fprintf(fp, "    }%s\n", (i + 1 < gcfg->space_count) ? "," : "");
+    }
+    fprintf(fp, "  ]\n}\n");
+
+    fclose(fp);
+    return 0;
+}
+
+int add_space_to_global_config(const char *id, const char *name, const char *path, int port) {
+    struct global_config gcfg;
+    if (load_global_config(&gcfg) < 0) {
+        return -1;
+    }
+
+    for (int i = 0; i < gcfg.space_count; i++) {
+        if (strcmp(gcfg.spaces[i].id, id) == 0) {
+            strncpy(gcfg.spaces[i].name, name, sizeof(gcfg.spaces[i].name) - 1);
+            gcfg.spaces[i].name[sizeof(gcfg.spaces[i].name) - 1] = '\0';
+            strncpy(gcfg.spaces[i].path, path, sizeof(gcfg.spaces[i].path) - 1);
+            gcfg.spaces[i].path[sizeof(gcfg.spaces[i].path) - 1] = '\0';
+            gcfg.spaces[i].port = port;
+            int result = save_global_config(&gcfg);
+            free_global_config(&gcfg);
+            return result;
+        }
+    }
+
+    if (gcfg.space_count >= gcfg.space_capacity) {
+        int new_capacity = (gcfg.space_capacity == 0) ? 16 : gcfg.space_capacity * 2;
+        struct space_entry *new_spaces = realloc(gcfg.spaces, 
+            sizeof(struct space_entry) * (size_t)new_capacity);
+        if (new_spaces == NULL) {
+            free_global_config(&gcfg);
+            return -1;
+        }
+        gcfg.spaces = new_spaces;
+        gcfg.space_capacity = new_capacity;
+    }
+
+    struct space_entry *entry = &gcfg.spaces[gcfg.space_count];
+    strncpy(entry->id, id, sizeof(entry->id) - 1);
+    entry->id[sizeof(entry->id) - 1] = '\0';
+    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    entry->name[sizeof(entry->name) - 1] = '\0';
+    strncpy(entry->path, path, sizeof(entry->path) - 1);
+    entry->path[sizeof(entry->path) - 1] = '\0';
+    entry->port = port;
+    gcfg.space_count++;
+
+    int result = save_global_config(&gcfg);
+    free_global_config(&gcfg);
+    return result;
+}
+
+void free_global_config(struct global_config *gcfg) {
+    if (gcfg != NULL && gcfg->spaces != NULL) {
+        free(gcfg->spaces);
+        gcfg->spaces = NULL;
+        gcfg->space_count = 0;
+        gcfg->space_capacity = 0;
+    }
 }
