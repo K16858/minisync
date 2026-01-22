@@ -256,3 +256,35 @@ int recv_meta_size(int socket, long long *size) {
     free(buffer);
     return 1;
 }
+
+int send_token(int socket, const char *token) {
+    if (token == NULL) {
+        return -1;
+    }
+    return send_content(socket, (char *)token, TYPE_TOKEN);
+}
+
+int recv_token(int socket, char *token, size_t token_len) {
+    int length;
+    Content content_type;
+
+    if (recv_all(socket, &content_type, sizeof(content_type)) <= 0) {
+        return 0;
+    }
+    if (recv_all(socket, &length, sizeof(length)) <= 0) {
+        return 0;
+    }
+    if (length <= 0 || length >= (int)token_len) {
+        return 0;
+    }
+
+    if (content_type != TYPE_TOKEN) {
+        return 0;
+    }
+
+    if (recv_all(socket, token, length) <= 0) {
+        return 0;
+    }
+    token[length] = '\0';
+    return 1;
+}
