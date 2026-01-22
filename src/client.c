@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include "protocol.h"
+#include <sys/syscall.h>
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
@@ -109,6 +110,14 @@ static int generate_random_hex(char *out, size_t bytes_len) {
         return -1;
     }
 
+#ifdef SYS_getrandom
+    ssize_t r = syscall(SYS_getrandom, buf, bytes_len, 0);
+    if (r == (ssize_t)bytes_len) {
+        bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
+        return 0;
+    }
+#endif
+
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd >= 0) {
         ssize_t r = read(fd, buf, bytes_len);
@@ -119,11 +128,8 @@ static int generate_random_hex(char *out, size_t bytes_len) {
         }
     }
 
-    for (size_t i = 0; i < bytes_len; i++) {
-        buf[i] = (unsigned char)(rand() & 0xFF);
-    }
-    bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
-    return 0;
+    // Both methods failed
+    return -1;
 }
 
 static int init_space(const char *init_name) {
@@ -143,7 +149,8 @@ static int init_space(const char *init_name) {
     char id[33];
     char token[33];
     if (generate_random_hex(id, 16) < 0 || generate_random_hex(token, 16) < 0) {
-        printf("Failed to generate id/token\n");
+        printf("Failed to generate secure random id/token.\n");
+        printf("Unable to read from /dev/urandom. Please check system permissions.\n");
         return 1;
     }
 
@@ -508,12 +515,19 @@ int main(int argc, char *argv[]) {
             freeaddrinfo(res);
             return 1;
         }
+        char resolved_path[PATH_MAX];
+        if (validate_file_path(file_path, ".", resolved_path, sizeof(resolved_path)) != 0) {
+            printf("Invalid or unsafe file path: %s\n", file_path);
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PULL_FILE)) {
             long long expected_size = -1;
             if (!recv_meta_size(connected_socket, &expected_size)) {
                 printf("Meta size missing\n");
             } else {
-                long long received_size = recv_file(connected_socket, file_path);
+                long long received_size = recv_file(connected_socket, resolved_path);
                 if (received_size >= 0 && expected_size >= 0 && received_size != expected_size) {
                     printf("Size mismatch: expected %lld received %lld\n", expected_size, received_size);
                 }
@@ -526,9 +540,16 @@ int main(int argc, char *argv[]) {
             freeaddrinfo(res);
             return 1;
         }
+        char resolved_path[PATH_MAX];
+        if (validate_file_path(file_path, ".", resolved_path, sizeof(resolved_path)) != 0) {
+            printf("Invalid or unsafe file path: %s\n", file_path);
+            close(connected_socket);
+            freeaddrinfo(res);
+            return 1;
+        }
         if (request_file_op(connected_socket, file_path, TYPE_PUSH_FILE)) {
             printf("push file: %s\n", file_path);
-            long long size = get_file_size(file_path);
+            long long size = get_file_size(resolved_path);
             if (size < 0) {
                 printf("No such file: %s\n", file_path);
                 close(connected_socket);
@@ -536,7 +557,7 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
             send_meta_size(connected_socket, size);
-            send_file(connected_socket, file_path);
+            send_file(connected_socket, resolved_path);
         }
     } else {
         printf("Unknown argument\n");

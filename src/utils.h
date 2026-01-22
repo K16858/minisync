@@ -43,5 +43,6 @@ int load_global_config(struct global_config *gcfg);
 int save_global_config(const struct global_config *gcfg);
 int add_space_to_global_config(const char *id, const char *name, const char *path);
 void free_global_config(struct global_config *gcfg);
+int validate_file_path(const char *file_path, const char *base_dir, char *resolved_path, size_t resolved_len);
 
 #endif
