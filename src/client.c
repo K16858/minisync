@@ -184,7 +184,20 @@ static int init_space(const char *init_name) {
     fprintf(tgt, "[]\n");
     fclose(tgt);
 
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        if (add_space_to_global_config(id, name, cwd, 61001) == 0) {
+            printf("Registered to global config (~/.config/minisync/config.json)\n");
+        } else {
+            printf("Warning: Failed to register to global config\n");
+        }
+    }
+
     printf("Initialized %s\n", dir);
+    printf("  ID:    %s\n", id);
+    printf("  Name:  %s\n", name);
+    printf("  Token: %s\n", token);
+    printf("  Port:  %d\n", 61001);
     return 0;
 }
 
