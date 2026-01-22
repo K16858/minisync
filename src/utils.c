@@ -594,3 +594,81 @@ void free_global_config(struct global_config *gcfg) {
         gcfg->space_capacity = 0;
     }
 }
+
+int validate_file_path(const char *file_path, const char *base_dir, char *resolved_path, size_t resolved_len) {
+    if (file_path == NULL || base_dir == NULL || resolved_path == NULL) {
+        return -1;
+    }
+
+    if (file_path[0] == '/') {
+        return -1;
+    }
+
+    if (strlen(file_path) != strcspn(file_path, "\0")) {
+        return -1;
+    }
+
+    if (strstr(file_path, "..") != NULL) {
+        return -1;
+    }
+
+    char full_path[PATH_MAX];
+    snprintf(full_path, sizeof(full_path), "%s/%s", base_dir, file_path);
+
+    char *real_path = realpath(full_path, NULL);
+    if (real_path == NULL) {
+        char parent_path[PATH_MAX];
+        strncpy(parent_path, full_path, sizeof(parent_path) - 1);
+        parent_path[sizeof(parent_path) - 1] = '\0';
+        
+        char *last_slash = strrchr(parent_path, '/');
+        if (last_slash != NULL) {
+            *last_slash = '\0';
+            char *real_parent = realpath(parent_path, NULL);
+            if (real_parent == NULL) {
+                return -1;
+            }
+            char *real_base = realpath(base_dir, NULL);
+            if (real_base == NULL) {
+                free(real_parent);
+                return -1;
+            }
+            
+            int is_safe = (strncmp(real_parent, real_base, strlen(real_base)) == 0);
+            if (is_safe) {
+                size_t base_len = strlen(real_base);
+                if (strlen(real_parent) == base_len || real_parent[base_len] == '/') {
+                    snprintf(resolved_path, resolved_len, "%s", full_path);
+                    free(real_parent);
+                    free(real_base);
+                    return 0;
+                }
+            }
+            free(real_parent);
+            free(real_base);
+            return -1;
+        }
+        return -1;
+    }
+
+    char *real_base = realpath(base_dir, NULL);
+    if (real_base == NULL) {
+        free(real_path);
+        return -1;
+    }
+
+    int is_safe = (strncmp(real_path, real_base, strlen(real_base)) == 0);
+    if (is_safe) {
+        size_t base_len = strlen(real_base);
+        if (strlen(real_path) == base_len || real_path[base_len] == '/') {
+            snprintf(resolved_path, resolved_len, "%s", real_path);
+            free(real_path);
+            free(real_base);
+            return 0;
+        }
+    }
+
+    free(real_path);
+    free(real_base);
+    return -1;
+}
