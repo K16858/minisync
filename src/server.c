@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <limits.h>
 #include "protocol.h"
 #include "utils.h"
 
@@ -250,10 +251,18 @@ int main(void) {
                 recv(connected_socket, buffer, length, MSG_WAITALL);
                 buffer[length] = '\0';
                 
+                char resolved_path[PATH_MAX];
+                if (validate_file_path(buffer, ".", resolved_path, sizeof(resolved_path)) != 0) {
+                    send_error(connected_socket, "Invalid or unsafe file path");
+                    send_end_message(connected_socket);
+                    free(buffer);
+                    break;
+                }
+                
                 // process
                 if (content_type == TYPE_PUSH_FILE) {
                     send_content(connected_socket, "[ACCEPT]", TYPE_PUSH_FILE);
-                    if (create_snapshot(buffer) < 0) {
+                    if (create_snapshot(resolved_path) < 0) {
                         send_error(connected_socket, "Snapshot failed");
                     }
                     long long expected_size = -1;
@@ -262,20 +271,20 @@ int main(void) {
                         free(buffer);
                         break;
                     }
-                    long long received_size = recv_file(connected_socket, buffer);
+                    long long received_size = recv_file(connected_socket, resolved_path);
                     if (expected_size >= 0 && received_size >= 0 && received_size != expected_size) {
                         send_error(connected_socket, "Size mismatch");
                     }
                 } else if (content_type == TYPE_PULL_FILE) {
                     send_content(connected_socket, "[ACCEPT]", TYPE_PULL_FILE);
-                    long long file_size = get_file_size(buffer);
+                    long long file_size = get_file_size(resolved_path);
                     if (file_size < 0) {
                         send_error(connected_socket, "No such file");
                         free(buffer);
                         break;
                     }
                     send_meta_size(connected_socket, file_size);
-                    send_file(connected_socket, buffer);
+                    send_file(connected_socket, resolved_path);
                 } else if (content_type == TYPE_MESSAGE) {
                     send_content(connected_socket, "Content type: MESSAGE", TYPE_MESSAGE);
                 } else if (content_type == TYPE_ERROR) {
