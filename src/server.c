@@ -166,6 +166,17 @@ int main(void) {
                 exit(0);
             }
             send_content(connected_socket, "HELLO_ACK", TYPE_HELLO_ACK);
+            char token_buf[128];
+            if (!recv_token(connected_socket, token_buf, sizeof(token_buf))) {
+                send_error(connected_socket, "Token missing");
+                close(connected_socket);
+                exit(0);
+            }
+            if (strncmp(token_buf, config.token, sizeof(config.token)) != 0) {
+                send_error(connected_socket, "Token invalid");
+                close(connected_socket);
+                exit(0);
+            }
             while (1){
                 int length;
                 Content content_type;

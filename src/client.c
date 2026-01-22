@@ -411,6 +411,12 @@ int main(int argc, char *argv[]) {
     }
 
     printf("HostName: %s\nPort: %s\n", hostname, port);
+    if (token == NULL) {
+        struct msync_config cfg;
+        if (load_config(".msync/config.json", &cfg) == 0) {
+            token = strdup(cfg.token);
+        }
+    }
     if (token != NULL) {
         printf("Token: [set]\n");
     }
@@ -450,6 +456,18 @@ int main(int argc, char *argv[]) {
     }
     if (!recv_hello_ack(connected_socket)) {
         printf("Hello ack error\n");
+        close(connected_socket);
+        freeaddrinfo(res);
+        return 1;
+    }
+    if (token == NULL) {
+        printf("Token is required. Use --token or init.\n");
+        close(connected_socket);
+        freeaddrinfo(res);
+        return 1;
+    }
+    if (send_token(connected_socket, token) < 0) {
+        printf("Token send error\n");
         close(connected_socket);
         freeaddrinfo(res);
         return 1;
