@@ -119,11 +119,7 @@ static int generate_random_hex(char *out, size_t bytes_len) {
         }
     }
 
-    for (size_t i = 0; i < bytes_len; i++) {
-        buf[i] = (unsigned char)(rand() & 0xFF);
-    }
-    bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
-    return 0;
+    return -1;
 }
 
 static int init_space(const char *init_name) {
