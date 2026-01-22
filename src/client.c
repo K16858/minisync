@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include "protocol.h"
+#include <sys/syscall.h>
 #include "utils.h"
 
 #define MAX_LINE_LEN 1024
@@ -109,6 +110,14 @@ static int generate_random_hex(char *out, size_t bytes_len) {
         return -1;
     }
 
+#ifdef SYS_getrandom
+    ssize_t r = syscall(SYS_getrandom, buf, bytes_len, 0);
+    if (r == (ssize_t)bytes_len) {
+        bytes_to_hex(buf, bytes_len, out, bytes_len * 2 + 1);
+        return 0;
+    }
+#endif
+
     int fd = open("/dev/urandom", O_RDONLY);
     if (fd >= 0) {
         ssize_t r = read(fd, buf, bytes_len);
@@ -119,6 +128,7 @@ static int generate_random_hex(char *out, size_t bytes_len) {
         }
     }
 
+    // Both methods failed
     return -1;
 }
 
