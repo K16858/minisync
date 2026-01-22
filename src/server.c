@@ -92,31 +92,26 @@ int main(void) {
         return 1;
     }
 
-    struct msync_config config;
-    memset(&config, 0, sizeof(config));
-    int port = 61001;
-    if (load_config(".msync/config.json", &config) == 0) {
-        port = config.port;
-    } else {
-        printf("Warning: .msync/config.json not found, using defaults\n");
-    }
-    if (config.id[0] == '\0') {
-        snprintf(config.id, sizeof(config.id), "unknown-id");
-    }
-    if (config.name[0] == '\0') {
-        snprintf(config.name, sizeof(config.name), "unknown-name");
-    }
-    if (config.hostname[0] == '\0') {
-        char hostbuf[64];
-        if (gethostname(hostbuf, sizeof(hostbuf)) == 0) {
-            hostbuf[sizeof(hostbuf) - 1] = '\0';
-            snprintf(config.hostname, sizeof(config.hostname), "%s", hostbuf);
-        } else {
-            snprintf(config.hostname, sizeof(config.hostname), "unknown-host");
-        }
+    struct space_entry *space = &gcfg.spaces[0];
+    printf("Starting server for space: %s\n", space->name);
+    printf("  Path: %s\n", space->path);
+    printf("  Port: %d\n\n", space->port);
+
+    if (chdir(space->path) < 0) {
+        printf("Failed to chdir to %s\n", space->path);
+        free_global_config(&gcfg);
+        return 1;
     }
 
-    int socket = start_server(port);
+    struct msync_config config;
+    memset(&config, 0, sizeof(config));
+    if (load_config(".msync/config.json", &config) != 0) {
+        printf("Failed to load %s/.msync/config.json\n", space->path);
+        free_global_config(&gcfg);
+        return 1;
+    }
+
+    int socket = start_server(space->port);
 
     int discover_socket = start_discover_server();
     if (discover_socket >= 0) {
@@ -141,7 +136,7 @@ int main(void) {
 
                 char reply[MAX_LINE_LEN + 1];
                 snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
-                         config.id, config.name, config.hostname, port);
+                         config.id, config.name, config.hostname, space->port);
                   if (sendto(discover_socket, reply, strlen(reply), 0,
                           (struct sockaddr*)&client_addr, addrlen) < 0) {
                       perror("discover sendto");
