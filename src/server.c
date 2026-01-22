@@ -119,19 +119,19 @@ int main(void) {
                     continue;
                 }
 
-                // TODO
-                struct space_entry *first_space = &gcfg.spaces[0];
                 char hostname[64] = "localhost";
                 gethostname(hostname, sizeof(hostname));
                 hostname[sizeof(hostname) - 1] = '\0';
                 
-                char reply[MAX_LINE_LEN + 1];
-                snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
-                         first_space->id, first_space->name, hostname, 61001);
-                  if (sendto(discover_socket, reply, strlen(reply), 0,
-                          (struct sockaddr*)&client_addr, addrlen) < 0) {
-                      perror("discover sendto");
-                  }
+                for (int i = 0; i < gcfg.space_count; i++) {
+                    char reply[MAX_LINE_LEN + 1];
+                    snprintf(reply, sizeof(reply), "MSYNC_HERE %s %s %s %d",
+                             gcfg.spaces[i].id, gcfg.spaces[i].name, hostname, 61001);
+                    if (sendto(discover_socket, reply, strlen(reply), 0,
+                            (struct sockaddr*)&client_addr, addrlen) < 0) {
+                        perror("discover sendto");
+                    }
+                }
             }
             close(discover_socket);
             exit(0);
