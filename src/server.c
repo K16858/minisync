@@ -80,9 +80,9 @@ int main(void) {
     printf("=== Global Configuration ===\n");
     printf("Registered spaces: %d\n", gcfg.space_count);
     for (int i = 0; i < gcfg.space_count; i++) {
-        printf("  [%d] %s (%s) - %s:%d\n",
+        printf("  [%d] %s (%s) - %s\n",
                i, gcfg.spaces[i].name, gcfg.spaces[i].id,
-               gcfg.spaces[i].path, gcfg.spaces[i].port);
+               gcfg.spaces[i].path);
     }
     printf("\n");
 

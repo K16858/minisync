@@ -186,7 +186,7 @@ static int init_space(const char *init_name) {
 
     char cwd[PATH_MAX];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
-        if (add_space_to_global_config(id, name, cwd, 61001) == 0) {
+        if (add_space_to_global_config(id, name, cwd) == 0) {
             printf("Registered to global config (~/.config/minisync/config.json)\n");
         } else {
             printf("Warning: Failed to register to global config\n");

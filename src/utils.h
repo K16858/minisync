@@ -23,7 +23,6 @@ struct space_entry {
     char id[64];
     char name[64];
     char path[1024];
-    int port;
 };
 
 struct global_config {
@@ -42,7 +41,7 @@ int append_target_json(const char *path, const char *id, const char *name, const
 int load_last_target(const char *path, char *host, size_t host_len, int *port);
 int load_global_config(struct global_config *gcfg);
 int save_global_config(const struct global_config *gcfg);
-int add_space_to_global_config(const char *id, const char *name, const char *path, int port);
+int add_space_to_global_config(const char *id, const char *name, const char *path);
 void free_global_config(struct global_config *gcfg);
 
 #endif

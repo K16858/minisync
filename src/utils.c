@@ -492,8 +492,7 @@ int load_global_config(struct global_config *gcfg) {
         struct space_entry *entry = &gcfg->spaces[gcfg->space_count];
         if (extract_json_string(obj_buf, "\"id\"", entry->id, sizeof(entry->id)) &&
             extract_json_string(obj_buf, "\"name\"", entry->name, sizeof(entry->name)) &&
-            extract_json_string(obj_buf, "\"path\"", entry->path, sizeof(entry->path)) &&
-            extract_json_int(obj_buf, "\"port\"", &entry->port)) {
+            extract_json_string(obj_buf, "\"path\"", entry->path, sizeof(entry->path))) {
             gcfg->space_count++;
         }
 
@@ -534,8 +533,7 @@ int save_global_config(const struct global_config *gcfg) {
         fprintf(fp, "    {\n");
         fprintf(fp, "      \"id\": \"%s\",\n", id_esc);
         fprintf(fp, "      \"name\": \"%s\",\n", name_esc);
-        fprintf(fp, "      \"path\": \"%s\",\n", path_esc);
-        fprintf(fp, "      \"port\": %d\n", e->port);
+        fprintf(fp, "      \"path\": \"%s\"\n", path_esc);
         fprintf(fp, "    }%s\n", (i + 1 < gcfg->space_count) ? "," : "");
     }
     fprintf(fp, "  ]\n}\n");
@@ -544,7 +542,7 @@ int save_global_config(const struct global_config *gcfg) {
     return 0;
 }
 
-int add_space_to_global_config(const char *id, const char *name, const char *path, int port) {
+int add_space_to_global_config(const char *id, const char *name, const char *path) {
     struct global_config gcfg;
     if (load_global_config(&gcfg) < 0) {
         return -1;
@@ -556,7 +554,6 @@ int add_space_to_global_config(const char *id, const char *name, const char *pat
             gcfg.spaces[i].name[sizeof(gcfg.spaces[i].name) - 1] = '\0';
             strncpy(gcfg.spaces[i].path, path, sizeof(gcfg.spaces[i].path) - 1);
             gcfg.spaces[i].path[sizeof(gcfg.spaces[i].path) - 1] = '\0';
-            gcfg.spaces[i].port = port;
             int result = save_global_config(&gcfg);
             free_global_config(&gcfg);
             return result;
@@ -582,7 +579,6 @@ int add_space_to_global_config(const char *id, const char *name, const char *pat
     entry->name[sizeof(entry->name) - 1] = '\0';
     strncpy(entry->path, path, sizeof(entry->path) - 1);
     entry->path[sizeof(entry->path) - 1] = '\0';
-    entry->port = port;
     gcfg.space_count++;
 
     int result = save_global_config(&gcfg);
