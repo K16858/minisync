@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc make
+    
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Build binaries
+      run: |
+        cd src
+        make clean
+        make
+        
+    - name: Prepare release artifacts
+      run: |
+        mkdir -p release
+        cp src/client release/msync-linux-amd64
+        cp src/server release/msync-server-linux-amd64
+        chmod +x release/msync-linux-amd64
+        chmod +x release/msync-server-linux-amd64
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/msync-linux-amd64
+          release/msync-server-linux-amd64
+        body: |
+          ## Installation
+          
+          ### Quick install (recommended)
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash
+          ```
+          
+          ### Manual install
+          1. Download the binaries for your platform
+          2. Move them to a directory in your PATH (e.g., `~/.local/bin`)
+          3. Make them executable: `chmod +x msync msync-server`
+          
+          ## What's Changed
+          
+          See [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for usage instructions.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
