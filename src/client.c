@@ -139,7 +139,8 @@ static int init_space(const char *init_name) {
     char id[33];
     char token[33];
     if (generate_random_hex(id, 16) < 0 || generate_random_hex(token, 16) < 0) {
-        printf("Failed to generate id/token\n");
+        printf("Failed to generate secure random id/token.\n");
+        printf("Unable to read from /dev/urandom. Please check system permissions.\n");
         return 1;
     }
 
