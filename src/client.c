@@ -85,6 +85,8 @@ static void print_usage(const char *prog) {
     printf("  %s pull <path> [--host HOST] [--port PORT] [--token TOKEN] [--yes]\n", prog);
     printf("  %s init <name>\n", prog);
     printf("  %s init --name NAME\n", prog);
+    printf("  %s join <id|index> --token TOKEN\n", prog);
+    printf("  %s join --id ID --token TOKEN --name NAME\n", prog);
     printf("  %s discover\n", prog);
     printf("  %s connect <id|index>\n", prog);
     printf("  %s -v | --version\n", prog);
@@ -205,6 +207,103 @@ static int init_space(const char *init_name) {
     printf("  Name:  %s\n", name);
     printf("  Token: %s\n", token);
     printf("  Port:  %d\n", 61001);
+    return 0;
+}
+
+static int join_space(const char *selector, const char *id, const char *token, const char *name) {
+    const char *use_id = id;
+    const char *use_name = name;
+
+    if (selector != NULL && token != NULL) {
+        // discover履歴から取得
+        if (discovered_count == 0) {
+            load_discover_cache();
+        }
+        if (discovered_count == 0) {
+            printf("No discover cache. Run discover first.\n");
+            return 1;
+        }
+
+        const struct discovered_space *target = NULL;
+        int is_number = 1;
+        for (size_t i = 0; selector[i] != '\0'; i++) {
+            if (selector[i] < '0' || selector[i] > '9') {
+                is_number = 0;
+                break;
+            }
+        }
+
+        if (is_number) {
+            int index = atoi(selector);
+            if (index >= 0 && index < discovered_count) {
+                target = &discovered[index];
+            }
+        } else {
+            for (int i = 0; i < discovered_count; i++) {
+                if (strcmp(discovered[i].id, selector) == 0) {
+                    target = &discovered[i];
+                    break;
+                }
+            }
+        }
+
+        if (target == NULL) {
+            printf("Target not found: %s\n", selector);
+            return 1;
+        }
+
+        use_id = target->id;
+        use_name = target->name;
+    } else if (id == NULL || token == NULL || name == NULL) {
+        printf("join requires: <id|index> --token TOKEN or --id ID --token TOKEN --name NAME\n");
+        return 1;
+    }
+
+    const char *dir = ".msync";
+    if (mkdir(dir, 0700) < 0 && errno != EEXIST) {
+        printf("Failed to create %s: %s\n", dir, strerror(errno));
+        return 1;
+    }
+
+    char hostname[256] = "unknown";
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        hostname[sizeof(hostname) - 1] = '\0';
+    }
+
+    char config_path[PATH_MAX];
+    snprintf(config_path, sizeof(config_path), "%s/config.json", dir);
+    FILE *cfg = fopen(config_path, "w");
+    if (cfg == NULL) {
+        printf("Failed to write %s: %s\n", config_path, strerror(errno));
+        return 1;
+    }
+    fprintf(cfg,
+            "{\n"
+            "  \"id\": \"%s\",\n"
+            "  \"name\": \"%s\",\n"
+            "  \"hostname\": \"%s\",\n"
+            "  \"token\": \"%s\",\n"
+            "  \"port\": %d\n"
+            "}\n",
+            use_id, use_name, hostname, token, 61001);
+    fclose(cfg);
+
+    char targets_path[PATH_MAX];
+    snprintf(targets_path, sizeof(targets_path), "%s/targets.json", dir);
+    FILE *tgt = fopen(targets_path, "w");
+    if (tgt == NULL) {
+        printf("Failed to write %s: %s\n", targets_path, strerror(errno));
+        return 1;
+    }
+    fprintf(tgt, "[]\n");
+    fclose(tgt);
+
+    printf("Joined space\n");
+    printf("  ID:    %s\n", use_id);
+    printf("  Name:  %s\n", use_name);
+    printf("  Token: %s\n", token);
+    printf("  Port:  61001\n");
+
     return 0;
 }
 
@@ -341,6 +440,10 @@ int main(int argc, char *argv[]) {
     char *token = NULL;
     char *init_name = NULL;
     char *connect_target = NULL;
+    char *join_selector = NULL;
+    char *join_id = NULL;
+    char *join_token = NULL;
+    char *join_name = NULL;
     int yes = 0;
 
     if (argc < 2) {
@@ -356,12 +459,16 @@ int main(int argc, char *argv[]) {
             return 0;
         } else if (strcmp(argv[i], "--name") == 0 && i + 1 < argc) {
             init_name = argv[++i];
+            join_name = init_name;
+        } else if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) {
+            join_id = argv[++i];
         } else if (strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
             hostname = argv[++i];
         } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
             port = argv[++i];
         } else if (strcmp(argv[i], "--token") == 0 && i + 1 < argc) {
             token = argv[++i];
+            join_token = token;
         } else if (strcmp(argv[i], "--yes") == 0) {
             yes = 1;
         } else if (strcmp(argv[i], "push") == 0 || strcmp(argv[i], "pull") == 0) {
@@ -380,6 +487,11 @@ int main(int argc, char *argv[]) {
             arg = "connect";
             if (i + 1 < argc && argv[i + 1][0] != '-') {
                 connect_target = argv[++i];
+            }
+        } else if (strcmp(argv[i], "join") == 0) {
+            arg = "join";
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                join_selector = argv[++i];
             }
         } else {
             print_usage(argv[0]);
@@ -412,6 +524,10 @@ int main(int argc, char *argv[]) {
 
     if (strncmp(arg, "connect", 8) == 0) {
         return connect_space(connect_target);
+    }
+
+    if (strncmp(arg, "join", 5) == 0) {
+        return join_space(join_selector, join_id, join_token, join_name);
     }
 
     if ((strncmp(arg, "push", 5) == 0 || strncmp(arg, "pull", 5) == 0) && (hostname == NULL || port == NULL)) {
